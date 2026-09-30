@@ -1,0 +1,6 @@
+Generated once using built-in imagegen, 30 September 2026.
+Use case: stylized-concept. Asset type: premium Gems CS2 storefront hero environment backdrop, widescreen 16:9.
+Cinematic highly detailed photoreal atmospheric underground jade quarry. Weathered dark emerald stone monoliths and one subtle faceted mineral formation concentrated predominantly on the RIGHT half. Big LEFT half very dark quiet negative space for website typography. Ground plane stays low.
+Cinematic environmental photography, physically believable lighting, tactile mineral surfaces, slight 35mm film grain. Restrained premium ominous editorial mood, night fog reminiscent of Haunted Boulder City. Warm amber-orange backlight rakes crystal edges, fine low windblown mist. Dark forest green #090f0e; weathered jade and emerald stone; warm amber #d9b47b highlights.
+Original environment only; no text, no logos, no watermark, no interface, no weapons, no people, no portal/rings, no bright neon, no purple.
+Final optimized project asset: public/assets/jade-quarry.webp. Real product PNG/AVIF images remain unchanged.
