@@ -21,6 +21,7 @@ export function RevealText({text}:{text:string}){return <span>{text}</span>;}
 // travel with that unit, so nested animations never fight or delay interaction.
 const groups=[
   '.site-header > *','.hero-find','.hero-landscape','.hero-fog','.hero-scroll','.marquee',
+  '.collection-details','.collection-object','.collection-choices > button','.category-preview-art','.category-preview-caption','.category-index > button','.help-questions > button','.help-answer > div',
   '.product-card','.topup-title','.topup-form-body > *','.topup-total','.topup-form-action',
   '.compare-row','.compare-note','.dossier > button','.dossier-body',
   '.arsenal-tabs','.arsenal-scene','.arsenal-current','.arsenal-receipt li','.arsenal-total','.budget-status',
@@ -40,8 +41,8 @@ function kindFor(element:HTMLElement,home:boolean):Kind {
   if(element.matches('[data-motion-heading]'))return 'words';
   if(element.matches('.hero-find'))return 'deck';
   if(element.matches('.hero-landscape,.hero-fog'))return 'scene';
-  if(element.matches('.gift-art,.arsenal-scene,.inspection'))return 'photo';
-  if(element.matches('.product-card,.dossier > button,.compare-row,.marquee')||element.matches('.faq-list summary'))return 'cut';
+  if(element.matches('.gift-art,.arsenal-scene,.inspection,.collection-object,.category-preview-art'))return 'photo';
+  if(element.matches('.product-card,.dossier > button,.compare-row,.marquee,.category-index > button,.help-questions > button')||element.matches('.faq-list summary'))return 'cut';
   return 'mist';
 }
 function framesFor(kind:Kind):Keyframe[] {
