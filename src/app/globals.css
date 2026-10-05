@@ -20,3 +20,10 @@ h1,h2,h3,h4,h5,h6{font-weight:650;line-height:1.15;letter-spacing:-.04em}
 .hero h1{font-size:clamp(56px,6.4vw,106px);font-weight:700;line-height:1.08;letter-spacing:-.055em}
 @media(min-width:1101px){.hero h1{font-size:clamp(68px,6.25vw,120px)}}
 @media(max-width:600px){.hero h1{font-size:clamp(32px,10.7vw,62px);letter-spacing:-.055em}.hero-intro p{font-size:14px}}
+
+/* Commissioner: sculpted display cuts and a calm, readable UI. */
+body{font-variation-settings:"FLAR" 0,"VOLM" 0,"slnt" 0}
+h1,h2,h3,h4,h5,h6,.wordmark,.marquee{font-variation-settings:"FLAR" 100,"VOLM" 65,"slnt" 0;letter-spacing:-.02em;font-weight:600}
+.hero h1{font-weight:650;letter-spacing:-.025em}
+.wordmark{font-weight:750;letter-spacing:-.045em}
+.price,.money-input input{font-variant-numeric:tabular-nums}

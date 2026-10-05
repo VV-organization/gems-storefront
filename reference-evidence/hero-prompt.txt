@@ -4,3 +4,9 @@ Cinematic highly detailed photoreal atmospheric underground jade quarry. Weather
 Cinematic environmental photography, physically believable lighting, tactile mineral surfaces, slight 35mm film grain. Restrained premium ominous editorial mood, night fog reminiscent of Haunted Boulder City. Warm amber-orange backlight rakes crystal edges, fine low windblown mist. Dark forest green #090f0e; weathered jade and emerald stone; warm amber #d9b47b highlights.
 Original environment only; no text, no logos, no watermark, no interface, no weapons, no people, no portal/rings, no bright neon, no purple.
 Final optimized project asset: public/assets/jade-quarry.webp. Real product PNG/AVIF images remain unchanged.
+
+5 October 2026 — hero quality correction:
+- Reconstructed quarry preserving composition and palette, with clearer rock facets and veins; built-in generator returned 1672×941 despite a 3840×2160 request. This is not native 4K.
+- Generated a native portrait composition at 941×1672 for viewports <=600px, avoiding the severe vertical enlargement/crop of the landscape image.
+- Saved both variants as lossless WebP: jade-quarry-detail.webp and jade-quarry-portrait.webp. Original preserved.
+- Background uses picture source selection, eager loading and high fetch priority. Verified desktop/mobile sources in browser, lint and typecheck passed.

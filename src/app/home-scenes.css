@@ -305,3 +305,6 @@ body:has(.home) .footer-invitation {display:flex;align-items:center;justify-cont
 .collection-save {position:absolute;right:24px;top:24px;z-index:3;border:1px solid #b9cbb750;background:#192a2350;}
 .collection-save[aria-pressed=true] {color:#d9b47b;background:#192a23;}
 @media(max-width:600px){.collection-save{right:20px;top:16px}}
+
+/* Short section titles stay on one line at every supported breakpoint. */
+.home h2,.site-footer .footer-invitation h2 {white-space:nowrap;text-wrap:nowrap;}

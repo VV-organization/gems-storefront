@@ -37,4 +37,4 @@ npm run build:pages
 - https://kstoimenov.com/ — контраст типографики и интерактивные сервисные строки.
 - Изображения/данные предметов — каталог Drops/Shards; source-поля сохранены в src/data/catalog.json.
 - Фон карьера создан встроенным imagegen; prompt в reference-evidence/hero-prompt.txt.
-- Manrope — текущая гарнитура. Шрифты из Google Fonts, лицензии OFL в public/fonts.
+- Commissioner Variable — единственная гарнитура сайта: заголовки, интерфейс, формы и цены. Локальная загрузка; лицензия SIL OFL в public/fonts/Commissioner-OFL.txt.

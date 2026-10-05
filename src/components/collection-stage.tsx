@@ -18,7 +18,7 @@ export function CollectionStage({products}:{products:Product[]}){
   const product=products[active];
   if(!product)return null;
   return <section className="collection-stage section" id="collection" aria-labelledby="collection-title">
-    <div className="section-heading"><MotionHeading id="collection-title">СТОИТ<br/><em>присмотреться.</em></MotionHeading><Link href="/catalog" className="text-link">Вся коллекция <Icon name="diagonal"/></Link></div>
+    <div className="section-heading"><MotionHeading id="collection-title">Коллекция</MotionHeading><Link href="/catalog" className="text-link">Вся коллекция <Icon name="diagonal"/></Link></div>
     <div className={`collection-scene collection-tone-${active}`} ref={scene}>
       <button className="collection-save icon-button" aria-pressed={shop.favorites.includes(product.id)} aria-label={`${shop.favorites.includes(product.id)?'Убрать из избранного':'В избранное'}: ${product.name}`} onClick={()=>shop.toggleFavorite(product.id)}><Icon name="heart"/></button>
       <div className="collection-details" key={`copy-${product.id}`}>
