@@ -116,22 +116,6 @@
 .home .arsenal-receipt .budget-status {color:#754029;}
 .home .arsenal-receipt .budget-status.within {color:#365332;}
 
-/* Overlapping project imagery from Kstoimenov, translated into an Apple card. */
-.home .gift-section {gap:0;grid-template-columns:1.1fr 1fr;padding-block:115px;align-items:stretch;}
-.home .gift-copy {padding:20px 55px 20px 0;}
-.home .gift-copy h2 {margin:0 0 30px;}
-.home .gift-art {max-width:420px;margin:85px 35px 50px 10px;transform:rotate(-12deg);}
-.home .gift-card {background:#d9b47b;box-shadow:0 30px 50px #0004;min-height:255px;padding:30px;}
-.home .gift-card-back {display:block;position:absolute;inset:0;background:#44634b;transform:rotate(19deg) translate(12px,8px);z-index:-1;}
-.home .gift-card>strong {font-weight:600;font-size:80px;}
-.home .gift-art-star {display:none;}
-.home .gift-form {--paper:#192a23;--muted:#526345;--line:#192a2340;--amber:#274b31;--accent:#2d4933;--surface:#cbd4b8;color:#192a23;background:#b9cbb7;border:0;padding:36px;align-self:start;}
-.home .gift-form h3 {margin:0 0 32px;}
-.home .gift-form select {background:transparent;color:#192a23;border-color:#192a2340;}
-.home .gift-form input {accent-color:#294b37;}
-.home .gift-nominals .selected {background:#294b37;color:#e7e9d8;}
-.home .gift-form .button.primary {background:#192a23;color:#e7e9d8;}
-.home .gift-form .form-message {color:#74291e;}
 
 /* Kstoimenov's full-width numerical rhythm becomes an editable equation. */
 .home .converter {padding:65px var(--pad);margin:0;background:#d9b47b;color:#192a23;border:0;position:relative;}
@@ -191,11 +175,6 @@ body:has(.home) .footer-invitation {display:flex;align-items:center;justify-cont
  .home .arsenal-receipt li button {flex-wrap:wrap;}
  .home .arsenal-receipt li small {margin-left:0;}
  .home .arsenal-current h3 {max-width:none;}
- .home .gift-copy {padding-right:35px;}
- .home .gift-form {padding:26px;}
- .home .gift-art {margin:75px 20px 25px 0;}
- .home .gift-card {min-height:210px;padding:24px;}
- .home .gift-card>strong {font-size:65px;}
  .help-answer {padding:30px;}
 }
 @media(max-width:700px){
@@ -221,9 +200,6 @@ body:has(.home) .footer-invitation {display:flex;align-items:center;justify-cont
  .category-index button:first-child {border-top:0;}
  .category-index button:last-child {grid-column:1/-1;}
  .category-index button[aria-pressed=true] h3 {translate:0;}
- .home .gift-section {grid-template-columns:1fr;gap:35px;}
- .home .gift-copy {padding:0;}
- .home .gift-art {max-width:380px;margin:60px 40px 35px;}
  .help-workspace {grid-template-columns:1fr;gap:25px;}
  .help-questions {padding-right:0;}
  .help-questions button {padding:17px 0;font-size:14px;}
@@ -272,10 +248,6 @@ body:has(.home) .footer-invitation {display:flex;align-items:center;justify-cont
  .home .arsenal-receipt ol {display:block;}
  .home .arsenal-receipt li button {flex-wrap:nowrap;}
  .home .arsenal-receipt li small {margin-left:auto;}
- .home .gift-card {min-height:200px;}
- .home .gift-art {margin-inline:20px;}
- .home .gift-card>strong {font-size:58px;}
- .home .gift-form {padding:25px 20px;}
  .home .converter {padding:45px var(--pad);}
  .home .converter-heading h2 {margin-bottom:35px;}
  .home .converter-fields {grid-template-columns:1fr;gap:14px;}
@@ -299,9 +271,6 @@ body:has(.home) .footer-invitation {display:flex;align-items:center;justify-cont
 .home .scene-description {left:50px;right:50px;bottom:14px;text-align:center;font-size:12px;}
 .home .arsenal-current h3 {max-width:none;}
 .collection-scene {overflow:clip;}
-.home .gift-copy,.home .gift-form {min-width:0;}
-@media(max-width:700px){.home .gift-section{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:600px){.home .gift-card{width:100%;min-height:0;aspect-ratio:1.5}.home .gift-art{margin-inline:28px}.home .gift-card-foot{font-size:9px}}
 .collection-save {position:absolute;right:24px;top:24px;z-index:3;border:1px solid #b9cbb750;background:#192a2350;}
 .collection-save[aria-pressed=true] {color:#d9b47b;background:#192a23;}
 @media(max-width:600px){.collection-save{right:20px;top:16px}}

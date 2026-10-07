@@ -25,7 +25,7 @@ const groups=[
   '.product-card','.topup-title','.topup-form-body > *','.topup-total','.topup-form-action',
   '.compare-row','.compare-note','.dossier > button','.dossier-body',
   '.arsenal-tabs','.arsenal-scene','.arsenal-current','.arsenal-receipt li','.arsenal-total','.budget-status',
-  '.gift-art','.gift-summary','.converter-fields > *','.converter-rate',
+  '.converter-fields > *','.converter-rate',
   '.footer-baseline > *','.catalog-category-tabs > *','.catalog-toolbar > *','.filter-heading','.results-count','.filter-chips',
   '.inspection','.detail-visual','.eyebrow','.skin-specs','.float-block','.detail-price-block','.payment-row',
   '.cart-stage-label','.cart-item','.summary-line','.order-total','.receipt-tear','.empty-basket-art',
@@ -41,7 +41,7 @@ function kindFor(element:HTMLElement,home:boolean):Kind {
   if(element.matches('[data-motion-heading]'))return 'words';
   if(element.matches('.hero-find'))return 'deck';
   if(element.matches('.hero-landscape,.hero-fog'))return 'scene';
-  if(element.matches('.gift-art,.arsenal-scene,.inspection,.collection-object,.category-preview-art'))return 'photo';
+  if(element.matches('.arsenal-scene,.inspection,.collection-object,.category-preview-art'))return 'photo';
   if(element.matches('.product-card,.dossier > button,.compare-row,.marquee,.category-index > button,.help-questions > button')||element.matches('.faq-list summary'))return 'cut';
   return 'mist';
 }
