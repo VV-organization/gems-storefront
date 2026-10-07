@@ -1,0 +1,54 @@
+/* Shared alignment across the storefront, independent of home scenes. */
+/* Shared tracks keep metadata, names, float and actions aligned within each row,
+   including different title lengths and the existing-cart action. */
+.product-grid > .product-card {
+  display:grid;
+  grid-row:span 6;
+  grid-template-rows:subgrid;
+  row-gap:0;
+}
+.product-grid .product-info {
+  display:grid;
+  grid-row:span 4;
+  grid-template-rows:subgrid;
+  row-gap:0;
+}
+.product-grid .product-info h3 {margin:6px 0 14px;min-height:0;align-self:start;}
+.product-grid .card-float {margin:0 0 16px;align-self:start;}
+.product-grid .product-bottom {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+}
+.product-grid .product-bottom .add-button {margin:0;justify-self:end;flex-shrink:0;}
+@media(max-width:600px) {
+  .product-grid .product-bottom {grid-template-columns:1fr;grid-template-rows:auto 40px;gap:12px;}
+  .product-grid .product-bottom .add-button {height:40px;width:40px;}
+  .product-grid .product-bottom .add-button.added {width:100%;}
+}
+
+
+/* All basket rows share the same price column, including shorter amounts. */
+.cart-items {display:grid;grid-template-columns:20px 120px minmax(0,1fr) max-content 30px;column-gap:15px;align-content:start;}
+.cart-items > * {grid-column:1 / -1;}
+.cart-items > .cart-item {grid-template-columns:subgrid;column-gap:inherit;}
+.account-sidebar nav svg:first-child {margin-left:0;flex-shrink:0;}
+@media(max-width:1150px) {
+  .cart-items {grid-template-columns:80px minmax(0,1fr) 30px;column-gap:10px;}
+}
+@media(max-width:800px) {
+  .cart-items {grid-template-columns:100px minmax(0,1fr) max-content 35px;}
+  .account-sidebar nav svg:first-child {display:block;}
+}
+@media(max-width:560px) {
+  .cart-items {grid-template-columns:75px minmax(0,1fr) 28px;column-gap:8px;}
+}
+
+/* Keep panel symbols beside their heading rather than on a stray wrapped line. */
+.panel-heading {display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;}
+.panel-heading > svg {margin-top:.35em;flex-shrink:0;}
+@media(max-width:560px) {
+  .panel-heading:has(.text-link) {grid-template-columns:1fr;gap:12px;}
+  .panel-heading > .text-link {justify-self:start;}
+}

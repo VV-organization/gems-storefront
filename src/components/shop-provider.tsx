@@ -4,7 +4,7 @@ import Link from "next/link";
 import {usePathname,useRouter} from "next/navigation";
 import type {Catalog,Product} from "@/lib/types";
 import {createSafeStorage} from "@/lib/browser-storage";
-import {mergeCartIds} from "@/lib/duo";
+import {mergeCartIds} from "@/lib/cart";
 import {Modal} from "./modal";
 import {Icon} from "./icon";
 
