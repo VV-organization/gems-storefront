@@ -147,9 +147,9 @@
 .help-answer .text-link {margin-top:30px;font-size:14px;}
 
 /* Oversized logo closure, like the reference's final brand panel. */
-body:has(.home) .site-footer {position:relative;isolation:isolate;padding-bottom:40px;overflow:hidden;}
-body:has(.home) .site-footer:before {content:"GEMS";display:block;position:absolute;z-index:-1;font-size:clamp(180px,33vw,630px);font-weight:800;letter-spacing:-.085em;line-height:.8;color:#b9cbb708;-webkit-text-stroke:1px #b9cbb71b;right:1vw;top:30px;pointer-events:none;}
-body:has(.home) .footer-invitation {display:flex;align-items:center;justify-content:space-between;gap:40px;padding-block:80px;}
+body:has(.home, .multi-game-catalog) .site-footer {position:relative;isolation:isolate;padding-bottom:40px;overflow:hidden;}
+body:has(.home, .multi-game-catalog) .site-footer:before {content:"GEMS";display:block;position:absolute;z-index:-1;font-size:clamp(180px,33vw,630px);font-weight:800;letter-spacing:-.085em;line-height:.8;color:#b9cbb708;-webkit-text-stroke:1px #b9cbb71b;right:1vw;top:30px;pointer-events:none;}
+body:has(.home, .multi-game-catalog) .footer-invitation {display:flex;align-items:center;justify-content:space-between;gap:40px;padding-block:80px;}
 
 @media(max-width:1100px){
  .home>.section {padding-block:75px;}
@@ -246,7 +246,7 @@ body:has(.home) .footer-invitation {display:flex;align-items:center;justify-cont
  .home .converter-rate {margin-top:20px;}
  .help-answer {padding:28px 24px;}
  .help-answer p {font-size:14px;}
- body:has(.home) .footer-invitation {flex-direction:column;align-items:flex-start;padding-block:60px;gap:25px;}
+ body:has(.home, .multi-game-catalog) .footer-invitation {flex-direction:column;align-items:flex-start;padding-block:60px;gap:25px;}
 }
 @media(prefers-reduced-motion:reduce){.collection-details,.collection-object,.category-preview-art,.help-answer>div{animation:none}.collection-object:hover img{transform:rotate(-14deg) scale(1.04)}}
 .category-preview-caption p {color:#334d3b;}

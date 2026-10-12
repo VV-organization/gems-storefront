@@ -5,6 +5,7 @@ import {usePathname,useRouter} from "next/navigation";
 import type {Catalog,Product} from "@/lib/types";
 import {createSafeStorage} from "@/lib/browser-storage";
 import {mergeCartIds} from "@/lib/cart";
+import {readProductSnapshots} from "@/lib/product-storage";
 import {Modal} from "./modal";
 import {Icon} from "./icon";
 
@@ -27,11 +28,13 @@ export function useShop(){const value=useContext(ShopContext);if(!value)throw ne
 export function ShopProvider({catalog,children}:{catalog:Catalog;children:ReactNode}) {
   const router=useRouter();const pathname=usePathname().replace(/\/$/,"")||"/";
   const [raw,setRaw]=useStored("gems:cart","[]");
+  const [productRaw,setProductRaw]=useStored("gems:cart-products","[]");
+  const storedProducts=useMemo(()=>readProductSnapshots(productRaw),[productRaw]);
   const [loginValue,setLoginValue]=useStored("gems:preview-login","0");
   const [tradeUrl,saveTradeUrl]=useStored("gems:trade-url","");
   const [notice,setNotice]=useState<{label:string;count:number}|null>(null);
   const [favoriteRaw,setFavoriteRaw]=useStored("gems:favorites","[]");
-  const favorites=useMemo(()=>{try{const v:unknown=JSON.parse(favoriteRaw);return Array.isArray(v)?v.filter((id):id is string=>typeof id==="string"&&catalog.products.some(p=>p.id===id)):[];}catch{return [];}},[favoriteRaw,catalog.products]);
+  const favorites=useMemo(()=>{try{const v:unknown=JSON.parse(favoriteRaw);return Array.isArray(v)?v.filter((id):id is string=>typeof id==="string"):[];}catch{return [];}},[favoriteRaw]);
   function toggleFavorite(id:string){setFavoriteRaw(JSON.stringify(favorites.includes(id)?favorites.filter(x=>x!==id):[...favorites,id]));}
   const [loginDialog,setLoginDialog]=useState(false);
   const [logoutDialog,setLogoutDialog]=useState(false);
@@ -40,19 +43,26 @@ export function ShopProvider({catalog,children}:{catalog:Catalog;children:ReactN
   // Layouts persist on navigation, so reset route-bound dialogs before children render.
   if(previousPath!==pathname){setPreviousPath(pathname);setPreviewProduct(null);setNotice(null);setLoginDialog(false);setLogoutDialog(false);}
   const cart=useMemo(()=>{
-    try {const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed))return [];const ids=new Set(parsed.filter(x=>typeof x==="string"));return catalog.products.filter(p=>ids.has(p.id));}catch{return [];}
-  },[raw,catalog.products]);
-  async function mutateCart(idsToAdd:string[],idToRemove?:string){
-    const mutate=()=>{let ids:string[]=[];try{const parsed:unknown=JSON.parse(readStored("gems:cart","[]"));if(Array.isArray(parsed))ids=parsed.filter((x):x is string=>typeof x==="string");}catch{}setRaw(JSON.stringify(mergeCartIds(ids.filter(id=>id!==idToRemove),idsToAdd,catalog.products.map(p=>p.id))));};
+    try {const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed))return [];const ids=new Set(parsed.filter(x=>typeof x==="string"));return [...catalog.products,...storedProducts].filter((p,i,all)=>ids.has(p.id)&&all.findIndex(x=>x.id===p.id)===i);}catch{return [];}
+  },[raw,catalog.products,storedProducts]);
+  async function mutateCart(productsToAdd:Product[],idToRemove?:string){
+    const mutate=()=>{
+      let ids:string[]=[];try{const parsed:unknown=JSON.parse(readStored("gems:cart","[]"));if(Array.isArray(parsed))ids=parsed.filter((x):x is string=>typeof x==="string");}catch{}
+      const snapshots=readProductSnapshots(readStored("gems:cart-products","[]"));
+      const byId=new Map([...snapshots,...productsToAdd.filter(p=>p.referenceId)].map(p=>[p.id,p]));
+      const next=mergeCartIds(ids.filter(id=>id!==idToRemove),productsToAdd.map(p=>p.id),[...catalog.products.map(p=>p.id),...byId.keys()]);
+      setProductRaw(JSON.stringify([...byId.values()].filter(p=>next.includes(p.id))));
+      setRaw(JSON.stringify(next));
+    };
     if(navigator.locks)await navigator.locks.request("gems-cart",mutate);else mutate();
   }
-  function add(product:Product){void mutateCart([product.id]).then(()=>setNotice({label:product.name,count:1}));}
-  function addMany(products:Product[]){const unique=products.filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i);void mutateCart(unique.map(p=>p.id)).then(()=>setNotice({label:unique.map(p=>p.weapon).join(" + "),count:unique.length}));}
+  function add(product:Product){void mutateCart([product]).then(()=>setNotice({label:product.name,count:1}));}
+  function addMany(products:Product[]){const unique=products.filter((p,i,a)=>a.findIndex(x=>x.id===p.id)===i);void mutateCart(unique).then(()=>setNotice({label:unique.map(p=>p.weapon).join(" + "),count:unique.length}));}
   function remove(id:string){void mutateCart([],id);}
   return <ShopContext.Provider value={{...catalog,cart,notice,dismissNotice:()=>setNotice(null),add,addMany,favorites,toggleFavorite,remove,loggedIn:loginValue==="1",login:()=>setLoginDialog(true),logout:()=>setLogoutDialog(true),tradeUrl,saveTradeUrl,previewProduct,setPreviewProduct}}>
     {children}
     {!previewProduct&&<CartNotice/>}
-    {loginDialog&&<Modal title="Личный кабинет" onClose={()=>setLoginDialog(false)}><div className="dialog-symbol"><Icon name="steam" size={32}/></div><h2>Личный кабинет</h2><p className="muted">Откройте локальный кабинет для настройки ссылки на обмен. Подключение аккаунта Steam пока недоступно.</p><button className="button primary full" onClick={()=>{setLoginValue("1");setLoginDialog(false);if(pathname!=="/cart")router.push("/account");}}>{pathname==="/cart"?"Продолжить":"Перейти в кабинет"} <Icon name="arrow"/></button></Modal>}
+    {loginDialog&&<Modal title="Личный кабинет" onClose={()=>setLoginDialog(false)}><div className="dialog-symbol"><Icon name="steam" size={32}/></div><h2>Личный кабинет</h2><p className="muted">Сохраните ссылку на обмен и настройте получение предметов в личном кабинете.</p><button className="button primary full" onClick={()=>{setLoginValue("1");setLoginDialog(false);if(pathname!=="/cart")router.push("/account");}}>{pathname==="/cart"?"Продолжить":"Перейти в кабинет"} <Icon name="arrow"/></button></Modal>}
     {logoutDialog&&<Modal title="Выйти из аккаунта?" onClose={()=>setLogoutDialog(false)}><h2>Выйти из аккаунта?</h2><p className="muted">Выбранные скины останутся в корзине.</p><div className="dialog-actions"><button className="button primary" autoFocus onClick={()=>setLogoutDialog(false)}>Остаться</button><button className="button secondary" onClick={()=>{setLoginValue("0");setLogoutDialog(false);}}>Выйти</button></div></Modal>}
   </ShopContext.Provider>;
 }

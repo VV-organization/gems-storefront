@@ -1,0 +1,80 @@
+/* Kstoimenov Services: a selected panel opens to reveal its object and details.
+   Haunted stories: persistent scene choices, object on the right, sage and amber. */
+.game-selector {
+ display:grid;
+ grid-template-columns:1.45fr 1fr 1fr;
+ gap:10px;
+ margin:34px 0 32px;
+ transition:grid-template-columns .5s cubic-bezier(.22,1,.36,1);
+}
+.game-selector[data-selected="rust"] {grid-template-columns:1fr 1.45fr 1fr;}
+.game-selector[data-selected="tf2"] {grid-template-columns:1fr 1fr 1.45fr;}
+.game-selector button {
+ position:relative;
+ isolation:isolate;
+ min-width:0;
+ min-height:216px;
+ padding:27px 24px 22px;
+ text-align:left;
+ color:#e7e9d8;
+}
+.game-selector button::before {
+ content:"";
+ position:absolute;
+ inset:0;
+ z-index:-1;
+ background:#192a23;
+ clip-path:polygon(0 10px,100% 0,100% calc(100% - 10px),0 100%);
+ transition:background .35s;
+}
+.game-selector button.active {color:#142d21;}
+.game-selector button.active::before {background:#b9cbb7;}
+.game-selector button:not(.active):hover::before {background:#244034;}
+.game-selector button:focus-visible {outline:2px solid #d9b47b;outline-offset:4px;}
+.game-selector-copy {position:absolute;top:27px;left:24px;z-index:2;display:flex;flex-direction:column;align-items:flex-start;max-width:62%;}
+.game-selector-title {font-size:clamp(36px,4vw,58px);font-weight:760;letter-spacing:-.055em;line-height:1.1;}
+.game-selector-name {font-size:13px;margin-top:8px;line-height:1.35;}
+.game-selector-description {font-size:12px;line-height:1.5;max-width:210px;margin-top:14px;opacity:0;transform:translateY(6px);transition:opacity .2s,transform .3s;}
+.game-selector .active .game-selector-description {opacity:.8;transform:none;transition-delay:.15s;}
+.game-selector-art {position:absolute;right:0;top:7px;bottom:18px;width:49%;pointer-events:none;transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .3s;opacity:.55;transform:translateY(8px) rotate(-8deg);}
+.game-selector-art img {width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 12px 14px #0003);}
+.game-selector .active .game-selector-art {opacity:1;transform:translateY(-4px) rotate(0deg);}
+.game-selector button:not(.active):hover .game-selector-art {opacity:.9;transform:translateY(-2px) rotate(-3deg);}
+.game-selector [data-game="rust"] .game-selector-art {width:45%;right:2%;}
+.game-selector-state {position:absolute;left:24px;bottom:20px;display:flex;align-items:center;gap:8px;font-size:11px;}
+.game-selector-state svg {border:1px solid currentColor;border-radius:50%;padding:4px;width:26px;height:26px;}
+.game-selector-state > span {order:1;}
+.game-selector .active .game-selector-state svg {background:#183829;color:#e7e9d8;border-color:#183829;}
+@media(max-width:1000px) {
+ .game-selector button {padding:24px 18px;min-height:208px;}
+ .game-selector-copy {top:24px;left:18px;max-width:65%;}
+ .game-selector-title {font-size:38px;}
+ .game-selector-description {font-size:11px;max-width:160px;}
+ .game-selector-state {left:18px;}
+ .game-selector-art {width:45%;}
+}
+@media(max-width:600px) {
+ .game-selector,.game-selector[data-selected] {grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:24px 0;}
+ .game-selector button {padding:16px 10px 12px;min-height:166px;}
+ .game-selector button::before {clip-path:polygon(0 6px,100% 0,100% calc(100% - 6px),0 100%);}
+ .game-selector-copy {top:16px;left:10px;max-width:calc(100% - 20px);}
+ .game-selector-title {font-size:28px;}
+ .game-selector-name {font-size:10px;max-width:90px;margin-top:66px;min-height:28px;}
+ .game-selector-description {display:none;}
+ .game-selector-art,.game-selector [data-game="rust"] .game-selector-art {top:43px;bottom:43px;right:8%;width:84%;transform:rotate(-8deg);}
+ .game-selector .active .game-selector-art {transform:rotate(0deg);}
+ .game-selector-state {left:auto;right:8px;top:15px;bottom:auto;}
+ .game-selector-state > span {display:none;}
+ .game-selector-state svg {width:17px;height:17px;padding:2px;}
+ .game-selector button:not(.active) .game-selector-state {display:none;}
+}
+@media(prefers-reduced-motion:reduce) {
+ .game-selector,.game-selector *,.game-selector *::before {transition:none!important;}
+}
+@media(max-width:380px) {
+ .game-selector-title {font-size:23px;}
+ .game-selector button {padding-inline:8px;}
+ .game-selector-copy {left:8px;max-width:calc(100% - 16px);}
+ .game-selector-state {right:6px;}
+ .game-selector-state svg {width:14px;height:14px;}
+}

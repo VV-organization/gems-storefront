@@ -1,0 +1,60 @@
+/* Kstoimenov's open service rows and Haunted's spacious object stages.
+   Native selection remains available to keyboards and mobile pickers. */
+.home .skin-compare { background:var(--ink); }
+.home .compare-weapon { width:280px; flex-shrink:0; }
+.compare-select-wrap { display:block; position:relative; min-width:0; }
+.home .skin-compare .compare-select-wrap select {
+  appearance:none; -webkit-appearance:none; display:block; width:100%;
+  border:0; border-bottom:1px solid #b9cbb766; border-radius:0;
+  background:#192a23; color:var(--paper); min-height:64px;
+  padding:18px 50px 18px 20px; font:inherit; font-size:15px;
+  line-height:1.5; cursor:pointer; text-overflow:ellipsis;
+  transition:background .2s,border-color .2s;
+}
+.home .skin-compare .compare-select-wrap select:hover { background:#233a2d; border-color:var(--amber); }
+.home .skin-compare .compare-select-wrap select:focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
+.compare-chevron { position:absolute; right:22px; top:50%; width:9px; height:9px; border-right:1.5px solid var(--amber); border-bottom:1.5px solid var(--amber); transform:translateY(-70%) rotate(45deg); pointer-events:none; }
+.home .compare-row { column-gap:32px; }
+.home .compare-selection>div,
+.home .compare-selection>div:last-child { background:transparent; border:0; padding:0 0 26px; }
+.home .compare-selection>[role=columnheader]:first-child { padding-top:21px; }
+.home .compare-image { margin-top:15px; min-height:260px; border-bottom:1px solid var(--line); }
+.home .compare-image img { width:100%; height:260px; object-fit:contain; transform:rotate(-8deg); }
+.home .compare-image:hover img { transform:rotate(-3deg) scale(1.04); }
+.home .compare-image>span { bottom:18px; right:0; width:36px; height:36px; display:grid; place-items:center; border:1px solid var(--line); border-radius:50%; color:var(--amber); }
+.home .compare-selection h3 { margin:0; padding:24px 0 0; }
+.home .compare-row>[role=cell],
+.home .compare-row>[role=cell]:last-child { background:transparent; border:0; border-top:1px solid var(--line); padding:22px 0; }
+.home .compare-actions>[role=cell],
+.home .compare-actions>[role=cell]:last-child { color:var(--paper); padding:0; }
+.home .compare-actions a { min-height:64px; align-items:center; padding:15px 18px; background:var(--surface); transition:background .2s,color .2s; }
+.home .compare-actions a:hover { background:var(--accent); color:var(--ink); }
+.home .compare-actions a>span { color:var(--amber); font-size:24px; }
+.home .compare-actions a:hover>span { color:inherit; }
+.home .compare-verdict { margin-left:152px; padding-top:28px; }
+@media(max-width:1100px) {
+  .home .compare-row { column-gap:22px; }
+  .home .compare-verdict { margin-left:107px; }
+}
+@media(max-width:700px) {
+  .home .skin-compare>header { display:block; }
+  .home .compare-weapon { display:block; width:100%; margin-top:24px; }
+}
+@media(max-width:600px) {
+  .home .compare-row { column-gap:18px; }
+  .home .compare-row>[role=rowheader],.home .compare-selection>[role=columnheader]:first-child { grid-column:1/-1; padding:18px 0 10px; }
+  .home .skin-compare .compare-select-wrap select { min-height:56px; font-size:13px; padding:14px 32px 14px 12px; }
+  .compare-chevron { right:13px; width:7px; height:7px; }
+  .home .compare-selection>div,.home .compare-selection>div:last-child { padding:0 0 20px; }
+  .home .compare-image { min-height:145px; margin-top:8px; }
+  .home .compare-image img { height:145px; }
+  .home .compare-image>span { width:27px; height:27px; bottom:8px; font-size:14px; }
+  .home .compare-selection h3 { padding-top:18px; }
+  .home .compare-row>[role=cell],.home .compare-row>[role=cell]:last-child { padding:16px 0; }
+  .home .compare-actions>[role=cell],.home .compare-actions>[role=cell]:last-child { padding:0; }
+  .home .compare-actions a { padding:12px; min-height:52px; font-size:12px; gap:6px; }
+  .home .compare-verdict { margin-left:0; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .home .compare-image:hover img { transform:none; }
+}

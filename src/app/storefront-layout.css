@@ -13,7 +13,11 @@
   grid-template-rows:subgrid;
   row-gap:0;
 }
-.product-grid .product-info h3 {margin:6px 0 14px;min-height:0;align-self:start;}
+.product-grid .product-info h3 {
+  margin:6px 0 14px;min-height:0;align-self:start;
+  font-size:22px;line-height:1.3;font-weight:600;letter-spacing:-.015em;
+  text-wrap:wrap;overflow-wrap:anywhere;
+}
 .product-grid .card-float {margin:0 0 16px;align-self:start;}
 .product-grid .product-bottom {
   display:grid;
@@ -23,6 +27,7 @@
 }
 .product-grid .product-bottom .add-button {margin:0;justify-self:end;flex-shrink:0;}
 @media(max-width:600px) {
+  .product-grid .product-info h3 {font-size:16px;}
   .product-grid .product-bottom {grid-template-columns:1fr;grid-template-rows:auto 40px;gap:12px;}
   .product-grid .product-bottom .add-button {height:40px;width:40px;}
   .product-grid .product-bottom .add-button.added {width:100%;}
@@ -51,4 +56,57 @@
 @media(max-width:560px) {
   .panel-heading:has(.text-link) {grid-template-columns:1fr;gap:12px;}
   .panel-heading > .text-link {justify-self:start;}
+}
+
+.category-search {width:100%;border:1px solid #30463a;padding:10px 12px;background:transparent;margin:12px 0;color:inherit;}
+.category-options {max-height:340px;overflow-y:auto;scrollbar-width:thin;}
+.category-options button {display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;padding:10px;text-align:left;font-size:14px;}
+.category-options button.active {background:#203e2f;color:#e4c48e;}
+.category-options small {opacity:.55;flex-shrink:0;font-variant-numeric:tabular-nums;}
+.catalog-pagination {display:flex;align-items:center;justify-content:space-between;gap:20px;padding:32px 0;border-top:1px solid #30463a;}
+.catalog-pagination > span {font-size:13px;color:#9aaa9e;}
+.multi-game-catalog .weapon-name {overflow-wrap:anywhere;}
+.multi-game-catalog .price-main {font-size:clamp(16px,1.2vw,20px);white-space:normal;}
+.multi-game-catalog .product-bottom {grid-template-columns:minmax(0,1fr) 44px;}
+.multi-game-catalog .add-button.added {font-size:11px;width:auto;min-width:44px;}
+.multi-game-catalog .product-bottom:has(.added) {grid-template-columns:minmax(0,1fr) 85px;}
+.product-image-fallback {display:flex;align-items:center;justify-content:center;min-height:180px;width:100%;font-size:13px;color:#9aaa9e;}
+.product-description {white-space:pre-line;overflow-wrap:anywhere;}
+.item-back {margin:36px 0;display:inline-flex;}
+@media(max-width:600px){
+ .multi-game-catalog .product-bottom,.multi-game-catalog .product-bottom:has(.added) {grid-template-columns:1fr;}
+ .catalog-pagination {flex-direction:column;align-items:stretch;}
+}
+.product-meta abbr:empty {visibility:hidden;}
+.detail-content h1,.detail-content h2,.cart-item-name h2 {overflow-wrap:anywhere;}
+.multi-game-catalog .product-bottom {align-items:start;}
+.cart-image .product-image-fallback {min-height:0;aspect-ratio:4/3;font-size:10px;text-align:center;}
+
+/* Fit native item images to the card instead of a short, padded Steam canvas. */
+.multi-game-catalog .product-image-button {
+  height:auto;
+  aspect-ratio:1.2;
+  padding:12px 10px 32px;
+}
+.multi-game-catalog .product-card[data-game="tf2"] .product-image-button {aspect-ratio:1;}
+.multi-game-catalog .product-image-button img {
+  position:absolute;
+  top:12px;
+  left:10px;
+  width:calc(100% - 20px);
+  height:calc(100% - 44px);
+  object-fit:contain;
+  object-position:center;
+  transform:none;
+}
+.multi-game-catalog .product-image-button .quick-label {left:10px;bottom:8px;}
+@media(max-width:600px) {
+  .multi-game-catalog .product-image-button,
+  .multi-game-catalog .product-card[data-game="tf2"] .product-image-button {aspect-ratio:.95;padding:8px 3px 25px;}
+  .multi-game-catalog .product-image-button img {top:8px;left:3px;width:calc(100% - 6px);height:calc(100% - 33px);}
+  .multi-game-catalog .product-image-button .quick-label {left:3px;bottom:6px;}
+}
+.multi-game-catalog .product-card:hover .product-image-button img {transform:scale(1.025);}
+@media(prefers-reduced-motion:reduce) {
+  .multi-game-catalog .product-card:hover .product-image-button img {transform:none;}
 }
