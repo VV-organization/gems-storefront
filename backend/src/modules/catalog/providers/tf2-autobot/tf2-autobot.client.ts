@@ -73,21 +73,37 @@ export class Tf2AutobotClient implements CatalogMetadataProvider {
     }
     const targets = validateTargets(command.marketHashNames);
     const results: CatalogMetadataItemInput[] = [];
-    for (const target of targets) {
-      const item = await this.fetchOne(target);
-      if (item !== null) results.push(item);
-    }
+    const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(this.options.runTimeoutMs)]);
+    let nextTarget = 0;
+    const worker = async (): Promise<void> => {
+      try {
+        while (nextTarget < targets.length) {
+          if (signal.aborted) throw unavailable();
+          const target = targets[nextTarget++];
+          if (target === undefined) break;
+          const item = await this.fetchOne(target, signal);
+          if (item !== null) results.push(item);
+        }
+      } catch (error) {
+        controller.abort();
+        throw error;
+      }
+    };
+    const workers = await Promise.allSettled(Array.from({ length: Math.min(this.options.concurrency, targets.length) }, worker));
+    const failure = workers.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected" || results.length === 0) throw unavailable();
     return createTf2AutobotSnapshot(targets, results, new Date());
   }
 
-  private async fetchOne(targetMarketHashName: string): Promise<CatalogMetadataItemInput | null> {
+  private async fetchOne(targetMarketHashName: string, runSignal: AbortSignal): Promise<CatalogMetadataItemInput | null> {
     const url = new URL(`${TF2_AUTOBOT_SOURCE_URL}/${encodeURIComponent(targetMarketHashName)}`);
     let response: Response;
     try {
       response = await fetch(url, {
         headers: { accept: "application/json" },
         redirect: "error",
-        signal: AbortSignal.timeout(this.options.requestTimeoutMs),
+        signal: AbortSignal.any([runSignal, AbortSignal.timeout(this.options.requestTimeoutMs)]),
       });
     } catch {
       throw unavailable();
@@ -105,6 +121,14 @@ export class Tf2AutobotClient implements CatalogMetadataProvider {
       await response.body?.cancel().catch(() => undefined);
       throw new Error("CATALOG_METADATA_TF2_AUTOBOT_CONTENT_TYPE_INVALID");
     }
-    return parseTf2AutobotItem(await boundedJson(response, this.options.maximumBodyBytes), targetMarketHashName);
+    const document = await boundedJson(response, this.options.maximumBodyBytes);
+    try {
+      return parseTf2AutobotItem(document, targetMarketHashName);
+    } catch (error) {
+      // A market variant without matching schema/type/image stays unpublished.
+      // Transport failures and malformed response bodies still abort the snapshot.
+      if (error instanceof Error && error.message === "CATALOG_METADATA_TF2_AUTOBOT_ITEM_INVALID") return null;
+      throw error;
+    }
   }
 }

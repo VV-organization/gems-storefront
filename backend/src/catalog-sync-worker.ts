@@ -134,6 +134,10 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+export function catalogSyncDelayMs(intervalMs: number, elapsedMs: number, retry: boolean): number {
+  return Math.max(1_000, (retry ? Math.min(intervalMs, 60_000) : intervalMs) - elapsedMs);
+}
+
 async function main(): Promise<void> {
   const options = parseCatalogSyncWorkerOptions(process.argv.slice(2));
   if (options.help) {
@@ -161,15 +165,17 @@ async function main(): Promise<void> {
     };
     for (;;) {
       const started=Date.now();
+      let retry = true;
       try {
         const result = await runCatalogSyncWorkerCycle(dependencies,options.mode);
+        retry = result.status !== "completed";
         process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), result })}\n`);
       } catch (error) {
         const message = error instanceof Error ? error.message : "CATALOG_SYNC_WORKER_CYCLE_FAILED";
         process.stderr.write(`${JSON.stringify({ at: new Date().toISOString(), error: message, status: "cycle_failed" })}\n`);
       }
       if (options.once || state.stopped) break;
-      await sleep(Math.max(1000,options.intervalMs-(Date.now()-started)));
+      await sleep(catalogSyncDelayMs(options.intervalMs, Date.now() - started, retry));
     }
   } finally {
     process.removeListener("SIGINT", stop);

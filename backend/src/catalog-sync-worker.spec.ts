@@ -3,9 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   parseCatalogSyncWorkerOptions,
   runCatalogSyncWorkerCycle,
+  catalogSyncDelayMs,
 } from "./catalog-sync-worker";
 
 describe("catalog sync worker", () => {
+  it("retries partial cold-start metadata within a minute instead of waiting a day", () => {
+    expect(catalogSyncDelayMs(86_400_000, 5_000, true)).toBe(55_000);
+    expect(catalogSyncDelayMs(86_400_000, 5_000, false)).toBe(86_395_000);
+    expect(catalogSyncDelayMs(300_000, 310_000, true)).toBe(1_000);
+  });
   it("parses bounded watch options", () => {
     expect(parseCatalogSyncWorkerOptions(["--watch"], {
       CATALOG_SYNC_WORKER_INTERVAL_MS: "60000",
