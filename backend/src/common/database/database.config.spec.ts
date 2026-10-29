@@ -1,0 +1,50 @@
+import { describe, expect, it } from "vitest";
+
+import type { AppConfig } from "../../config/app-config";
+import { buildDatabaseConnectionOptions } from "./database.config";
+
+const baseConfig: AppConfig = {
+  nodeEnv: "test",
+  port: 3000,
+  admin: {},
+  steam: {},
+  arcoPay: { paymentOrigin: "https://payment.paidlayer.com", environment: "sandbox", providerMode: "disabled", apiUrl: "https://api.clickit.team/api/v1" },
+  sih: {
+    marketBaseUrl: "https://api.sih.market",
+    maximumBodyBytes: 16_777_216,
+    requestTimeoutMs: 60_000,
+    steamRefillBaseUrl: "https://core.steaminventoryhelper.com",
+  },
+  catalog: {
+    publicGames: ["cs2"],
+  },
+  notifications: {
+    smtpHost: "smtp.purelymail.com",
+    smtpPort: 465,
+    smtpSecure: true,
+  },
+  integration: {
+    publicOrigin: "https://gems.example",
+    adminOrigin: "https://gems.example",
+  },
+  corsOrigins: [],
+};
+
+describe("buildDatabaseConnectionOptions", () => {
+  it("keeps the database disabled until DATABASE_URL is configured", () => {
+    expect(buildDatabaseConnectionOptions(baseConfig)).toEqual({
+      enabled: false,
+      reason: "DATABASE_URL_MISSING",
+    });
+  });
+
+  it("exposes a configured database url without connecting during module bootstrap", () => {
+    expect(buildDatabaseConnectionOptions({
+      ...baseConfig,
+      databaseUrl: "postgres://gems:gems@localhost:55432/gems",
+    })).toEqual({
+      enabled: true,
+      databaseUrl: "postgres://gems:gems@localhost:55432/gems",
+    });
+  });
+});

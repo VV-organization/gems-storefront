@@ -1,0 +1,54 @@
+import {beforeAll,afterAll,describe,it,expect} from 'vitest';
+import {commerceFixture,type CommerceFixture,type FixtureIdentity,responseBody} from '../test-support/commerce-fixture';
+import {WalletService} from '../modules/wallet/wallet.service';
+import {FulfillmentOperationService} from '../modules/fulfillment/fulfillment-operation.service';
+const databaseUrl=process.env.GEMS_TEST_DATABASE_URL;
+type Quote={id:string;totalCoinMinor:number};
+describe.skipIf(!databaseUrl)('Gems end-to-end commerce with isolated providers',()=>{
+ let f:CommerceFixture,owner:FixtureIdentity;
+ beforeAll(async()=>{if(!databaseUrl)throw new Error('test database missing');f=await commerceFixture(databaseUrl);owner=await f.identity('smoke-steam');await f.catalog();});
+ afterAll(async()=>{await f.close();});
+ const version=async()=>responseBody<{version:number}>(await f.http().get('/cart').set('Cookie',owner.cookie).expect(200)).version;
+ const quote=async()=>responseBody<Quote>(await f.http().post('/checkout/quotes').set('Cookie',owner.cookie).set('x-csrf-token',owner.csrf).send({cartVersion:await version()}).expect(200));
+ const purchase=async(q:Quote,key:string,cartVersion:number)=>responseBody<{id:string}>(await f.http().post('/checkout/cart').set('Cookie',owner.cookie).set('x-csrf-token',owner.csrf).set('idempotency-key',key).send({quoteId:q.id,cartVersion}).expect(201));
+ it('catalog → Steam session → trade URL → verified wallet credit → explicit quoted buy → delivery survives restart',async()=>{
+  await f.http().get('/catalog/fixture-knife').expect(200);
+  await f.http().put('/cart/items/fixture-knife').set('Cookie',owner.cookie).set('x-csrf-token',owner.csrf).set('idempotency-key',f.key()).send({quantity:1,expectedCartVersion:0}).expect(200);
+  await f.http().put('/me/steam-trade-url').set('Cookie',owner.cookie).set('x-csrf-token',owner.csrf).send({tradeUrl:`https://steamcommunity.com/tradeoffer/new/?partner=${BigInt(owner.steamId)-76561197960265728n}&token=fixtureToken`}).expect(200);
+  const topQuote=responseBody<{quoteId:string;fiatAmountMinor:number}>(await f.http().post('/payments/top-up/quotes').set('Cookie',owner.cookie).set('x-csrf-token',owner.csrf).send({coinAmountMinor:100000}).expect(200));
+  const payment=responseBody<{id:string}>(await f.http().post('/payments/top-up/sessions').set('Cookie',owner.cookie).set('x-csrf-token',owner.csrf).set('idempotency-key',f.key()).send({quoteId:topQuote.quoteId,acceptedFiatMinor:topQuote.fiatAmountMinor}).expect(200));
+  expect((await f.captured(payment.id,topQuote.fiatAmountMinor)).body).toMatchObject({status:'processed'});expect((await f.pool.query('SELECT * FROM orders')).rowCount).toBe(0);
+  const q=await quote(),v=await version(),key=f.key();await f.restart();const order=await purchase(q,key,v);await f.restart();expect(await purchase(q,key,v)).toEqual(order);
+  expect(await f.app.get(WalletService).getBalance(owner.userId)).toMatchObject({postedCoinMinor:100000,heldCoinMinor:q.totalCoinMinor});
+  expect((await f.app.get(FulfillmentOperationService).submitNext()).status).toBe('submitted');await f.restart();await f.pool.query('UPDATE fulfillment_commands SET available_at=now()');expect((await f.app.get(FulfillmentOperationService).reconcileNext()).status).toBe('completed');
+  expect(await f.app.get(WalletService).getBalance(owner.userId)).toEqual({postedCoinMinor:100000-q.totalCoinMinor,heldCoinMinor:0,availableCoinMinor:100000-q.totalCoinMinor});
+  const history=await f.http().get('/orders/me').set('Cookie',owner.cookie).expect(200);expect(history.body).toMatchObject({orders:[{id:order.id,status:'fulfilled',lines:[{fulfillmentStage:'delivered'}]}]});expect(JSON.stringify(history.body)).not.toMatch(/ciphertext|fixtureToken/);
+ });
+ it('duo budget → atomic pair → partial delivery captures only one line',async()=>{
+  const pair=responseBody<{id:string;totalCoinMinor:number}>(await f.http().post('/duo/quotes').send({knifeSlug:'fixture-knife',gloveSlug:'fixture-gloves',budgetRubMinor:100000}).expect(200));
+  await f.http().post('/cart/duo').set('Cookie',owner.cookie).set('x-csrf-token',owner.csrf).set('idempotency-key',f.key()).send({quoteId:pair.id,expectedCartVersion:await version()}).expect(200);
+  const before=await f.app.get(WalletService).getBalance(owner.userId),q=await quote(),order=await purchase(q,f.key(),await version()),engine=f.app.get(FulfillmentOperationService);
+  await Promise.all([engine.submitNext(),engine.submitNext()]);
+  f.provider.getSkinOrder.mockImplementation(({customId})=>{const known=f.known.get(customId);if(!known)throw new Error('missing order');return Promise.resolve({...known,status:known.marketHashName==='fixture-gloves'?'failed' as const:'finished' as const});});
+  await f.pool.query('UPDATE fulfillment_commands SET available_at=now()');await Promise.all([engine.reconcileNext(),engine.reconcileNext()]);
+  expect((await f.app.get(WalletService).getBalance(owner.userId))).toEqual({postedCoinMinor:before.postedCoinMinor-q.totalCoinMinor/2,availableCoinMinor:before.availableCoinMinor-q.totalCoinMinor/2,heldCoinMinor:0});
+  const history=responseBody<{orders:{id:string;status:string;lines:{fulfillmentStage:string}[]}[]}>(await f.http().get('/orders/me').set('Cookie',owner.cookie).expect(200));expect(history.orders.find(item=>item.id===order.id)).toMatchObject({status:'partially_fulfilled'});expect(history.orders.find(item=>item.id===order.id)?.lines.map(item=>item.fulfillmentStage).sort()).toEqual(['delivered','failed']);
+  const trades=responseBody<{events:{status:string}[]}>(await f.http().get('/fulfillment/me/trades').set('Cookie',owner.cookie).expect(200));expect(trades.events.some(event=>event.status==='failed')).toBe(true);
+ });
+ it('email OTP → direct Steam payment → pending → delivery has zero wallet impact',async()=>{
+  const challenge=responseBody<{id:string}>(await f.http().post('/auth/email/challenges').send({email:'steam-only@example.test',purpose:'sign_in'}).expect(202));
+  const code=(await f.pool.query<{payload:{otp:string}}>("SELECT payload FROM notification_outbox WHERE event_type='email.verification' AND entity_id=$1",[challenge.id])).rows[0]?.payload.otp;if(!code)throw new Error('OTP missing');
+  await f.http().post(`/auth/email/challenges/${challenge.id}/verify`).send({code:'wrong'}).expect(401);
+  const verified=await f.http().post(`/auth/email/challenges/${challenge.id}/verify`).send({code}).expect(200);const cookies=verified.headers['set-cookie'] as unknown as string[];const cookie=cookies.map(value=>value.split(';')[0]).join('; ');
+  const csrf=responseBody<{token:string}>(await f.http().get('/session/csrf').set('Cookie',cookie).expect(200)).token;
+  const identity=responseBody<{id:string}>(await f.http().get('/session/me').set('Cookie',cookie).expect(200));
+  const q=responseBody<{quoteId:string;fiatAmountMinor:number}>(await f.http().post('/payments/steam-refill/quotes').set('Cookie',cookie).set('x-csrf-token',csrf).send({amountRub:50,steamLogin:'steam_receiver'}).expect(200));
+  const payment=responseBody<{id:string}>(await f.http().post('/payments/steam-refill/sessions').set('Cookie',cookie).set('x-csrf-token',csrf).set('idempotency-key',f.key()).send({quoteId:q.quoteId,acceptedFiatMinor:q.fiatAmountMinor}).expect(200));
+  expect((await f.captured(payment.id,q.fiatAmountMinor)).body).toMatchObject({status:'processed'});
+  await f.http().get(`/payments/sessions/${payment.id}`).set('Cookie',cookie).expect(200).expect(({body}:{body:unknown})=>{expect(body).toMatchObject({paymentStatus:'paid',fulfillmentStatus:'pending'});});
+  await f.restart();expect((await f.app.get(FulfillmentOperationService).submitNext()).status).toBe('completed');
+  await f.http().get(`/payments/sessions/${payment.id}`).set('Cookie',cookie).expect(200).expect(({body}:{body:unknown})=>{expect(body).toMatchObject({paymentStatus:'paid',fulfillmentStatus:'delivered'});});
+  expect((await f.pool.query('SELECT * FROM wallet_transactions WHERE user_id=$1',[identity.id])).rowCount).toBe(0);expect((await f.pool.query('SELECT * FROM wallet_holds WHERE user_id=$1',[identity.id])).rowCount).toBe(0);
+  expect(f.provider.paySteamRefill).toHaveBeenCalledWith({amountRub:50,steamUsername:'steam_receiver',transactionId:'transaction-steam_receiver'});
+ });
+});

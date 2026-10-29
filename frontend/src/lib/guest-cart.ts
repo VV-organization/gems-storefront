@@ -1,0 +1,2 @@
+export function guestCartIds(raw:string):string[]{try{const value:unknown=JSON.parse(raw);return Array.isArray(value)?[...new Set(value.filter((x):x is string=>typeof x==='string'&&x.length>0&&x.length<=250))].slice(0,50):[];}catch{return [];}}
+export function canMigrateGuestItem(old:{priceRevision?:string},live:{priceRevision?:string;availability?:string}){return !!old.priceRevision&&old.priceRevision===live.priceRevision&&live.availability==='available';}

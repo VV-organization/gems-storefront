@@ -1,0 +1,3 @@
+/* Live descriptions can be longer than designer samples. Keep the original grid. */
+.skin-specs > div { min-width: 0; }
+.skin-specs strong { overflow-wrap: anywhere; }

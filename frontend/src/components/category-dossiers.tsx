@@ -1,0 +1,18 @@
+'use client';
+import {MotionHeading} from './motion';
+import {useRef,useState} from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import {useRemote} from '@/lib/use-remote';
+import {mapProduct,type CatalogPage} from '@/lib/catalog-adapter';
+import {categoryArtwork} from '@/lib/presentation';
+import type {Catalog} from '@/lib/types';
+import {Icon} from './icon';
+export function CategoryDossiers({catalog}:{catalog:Catalog}){
+ const [active,setActive]=useState('knife');
+ const preview=useRef<HTMLDivElement>(null);
+ function choose(id:string){setActive(id);if(matchMedia('(max-width:700px)').matches)preview.current?.scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});}
+ const category=catalog.categories.find(c=>c.id===active)??catalog.categories[0];
+ const live=useRemote<CatalogPage>(`/catalog?game=cs2&categoryId=${encodeURIComponent(category.id)}&limit=1`,null);const product=live.data?.items[0]?mapProduct(live.data.items[0]):null;const artwork=categoryArtwork(category.id);
+ return <section className="section dossiers" id="categories"><div className="section-heading"><MotionHeading>Категории</MotionHeading><p>От первого пистолетного<br/>до решающего раунда.</p></div><div className="category-atlas"><div className="category-preview" id="category-preview" ref={preview}><div className="category-preview-art" key={category.id}>{(product||artwork)&&<Image src={product?.imageUrl??artwork!} alt={product?.name??category.name} width={900} height={700}/>}</div><div className="category-preview-caption" key={`caption-${category.id}`}><p>{category.description}</p><Link href={`/catalog?category=${category.id}`} className="text-link">Смотреть {live.data?.pagination.total??"—"} предметов <Icon name="diagonal"/></Link></div></div><div className="category-index" role="group" aria-label="Категории скинов">{catalog.categories.map(c=><button key={c.id} aria-pressed={active===c.id} aria-controls="category-preview" onClick={()=>choose(c.id)}><h3>{c.name}</h3><Icon name={active===c.id?'diagonal':'plus'}/></button>)}</div></div></section>;
+}

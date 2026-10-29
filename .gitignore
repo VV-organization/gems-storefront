@@ -1,12 +1,15 @@
 node_modules/
 .next/
+dist/
 out/
 out-pages/
-*.tsbuildinfo
-.env*
-!.env.example
 .DS_Store
-output/
-
-# Local historical requirements from other projects
-docs/source-requirements/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.superpowers/
+test-results/
+playwright-report/
+coverage/
+.local/

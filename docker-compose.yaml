@@ -1,0 +1,201 @@
+name: gems-storefront
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: gems
+      POSTGRES_DB: gems
+    volumes:
+      - /opt/gems-storefront/volumes/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gems -d gems']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - /opt/gems-storefront/volumes/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  migrate:
+    build:
+      context: ./backend
+    restart: "no"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['npm', 'run', 'db:migrate']
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['node', 'dist/main.js']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - '127.0.0.1:3001:5202'
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'fetch("http://127.0.0.1:5202/health/ready").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))']
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
+  catalog:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['node', 'dist/catalog-sync-worker.js', '--watch', '--supplier-only']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  catalog-metadata:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['node', 'dist/catalog-sync-worker.js', '--watch', '--metadata-only']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  fulfillment:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['node', 'dist/fulfillment-worker.js']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  notifications:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['node', 'dist/notifications-worker.js', '--watch']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  vv-admin:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['node', 'dist/vv-admin-dispatcher-worker.js', '--watch']
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  reconciliation:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: '5202'
+      DATABASE_URL: postgresql://gems:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/gems
+      REDIS_URL: redis://redis:6379/0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    command: ['node', 'dist/reconciliation-worker.js']
+    stop_grace_period: 120s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy

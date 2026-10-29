@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {guestCartIds,canMigrateGuestItem} from '../src/lib/guest-cart.ts';
+test('guest storage is bounded and malformed storage cannot authorize a purchase',()=>{assert.deepEqual(guestCartIds('["a","a",42,"b"]'),['a','b']);assert.deepEqual(guestCartIds('bad'),[]);assert.equal(guestCartIds(JSON.stringify(Array.from({length:60},(_,i)=>String(i)))).length,50);});
+test('only unchanged, live guest items may migrate without confirmation',()=>{assert.equal(canMigrateGuestItem({priceRevision:'a'},{priceRevision:'a',availability:'available'}),true);assert.equal(canMigrateGuestItem({}, {priceRevision:'a',availability:'available'}),false);assert.equal(canMigrateGuestItem({priceRevision:'a'},{priceRevision:'b',availability:'available'}),false);assert.equal(canMigrateGuestItem({priceRevision:'a'},{priceRevision:'a',availability:'unavailable'}),false);});

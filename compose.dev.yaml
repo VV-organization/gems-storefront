@@ -1,0 +1,31 @@
+name: gems-local
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gems
+      POSTGRES_USER: gems
+      POSTGRES_PASSWORD: gems_local_only
+    ports: ['127.0.0.1:55461:5432']
+    volumes: ['gems-postgres:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gems -d gems']
+      interval: 2s
+      retries: 20
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gems_test
+      POSTGRES_USER: gems_test
+      POSTGRES_PASSWORD: gems_test_local_only
+    ports: ['127.0.0.1:55462:5432']
+    tmpfs: ['/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gems_test -d gems_test']
+      interval: 2s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    ports: ['127.0.0.1:56391:6379']
+volumes:
+  gems-postgres:

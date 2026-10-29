@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+out-pages/
+*.tsbuildinfo
+.env*
+!.env.example
+.DS_Store
+output/
+
+# Local historical requirements from other projects
+docs/source-requirements/

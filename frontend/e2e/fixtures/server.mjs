@@ -1,0 +1,30 @@
+// Explicit local test server. Never imported by application code or enabled in production.
+import {createServer} from 'node:http';
+import {readFileSync} from 'node:fs';
+const design=JSON.parse(readFileSync(new URL('../../src/data/catalog.json',import.meta.url),'utf8'));
+const slots=JSON.parse(readFileSync(new URL('../../src/data/presentation.json',import.meta.url),'utf8'));
+const items=design.products.map((p,i)=>{const slot=slots.find(s=>s.slot===p.id);return {id:slot?.slug??p.id,slug:slot?.slug??p.id,kind:'skins',category:'Скины',categoryId:p.categoryId,game:'cs2',productType:p.weapon,title:p.name,description:p.description,image:p.imageUrl,condition:p.condition,weapon:p.weapon,stattrak:p.stattrak,marketHashName:slot?.marketHashName??p.name,priceRevision:`fixture-${i}`,pricingSettingId:'fixture',price:{currency:'COINS',amountMinor:p.priceMinor,scale:2,display:''},availability:'available',fulfillmentMode:'steam-trade',createdAt:'2026-10-11T00:00:00Z',popularity:design.products.length-i,meta:[p.rarity],keywords:[],details:{specifications:[],fulfillment:{title:'Steam',description:'',requirements:[]}}};});
+for(const game of ['rust','tf2'])for(let i=0;i<30;i++)items.push({...items[0],id:`${game}-${i}`,slug:`${game}-${i}`,game,title:`${game} item ${i}`,marketHashName:`${game} item ${i}`,weapon:game==='rust'?'Metal Facemask':'Scattergun',categoryId:`${game}:${i%2?'Armor':'Weapon'}`,condition:'',stattrak:false,priceRevision:`${game}-r1`,price:{currency:'COINS',amountMinor:10000+i*100,scale:2,display:''}});
+const aliases=JSON.parse(readFileSync(new URL('../../../backend/src/data/catalog-aliases.json',import.meta.url)));
+const config={currency:'Gems',rate:{fiatMinor:100,coinMinor:200},rateVersion:'fixture',paymentMethods:['sbp'],capabilities:{guestSteamRefillEnabled:true,checkoutEnabled:true,walletTopUpEnabled:true,steamRefillEnabled:true}};
+createServer(async(req,res)=>{const url=new URL(req.url,'http://127.0.0.1:5204');let raw='';for await(const chunk of req)raw+=chunk;const body=raw?JSON.parse(raw):{};const send=(data,status=200)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(data));};
+ if(url.pathname==='/health/live')return send({status:'fixture'});
+ if(url.pathname==='/storefront/config')return send(config);
+ if(url.pathname==='/session/me')return send({message:'Guest'},401);
+ if(url.pathname==='/catalog/lookup')return send({items:items.filter(p=>body.slugs.map(s=>aliases[s]??s).includes(p.slug))});
+ if(url.pathname==='/catalog'){
+  const query=url.searchParams;
+  const wearCodes={'Прямо с завода':'FN','Немного поношенное':'MW','После полевых испытаний':'FT','Поношенное':'WW','Закалённое в боях':'BS','Закаленное в боях':'BS'};
+  const matching=items.filter(p=>(!query.get('game')||p.game===query.get('game'))&&(!query.get('q')||`${p.title} ${p.description} ${p.weapon}`.toLowerCase().includes(query.get('q').toLowerCase()))&&(!query.get('condition')||(wearCodes[p.condition]??p.condition)===query.get('condition'))&&(!query.get('stattrak')||p.stattrak===(['true','1'].includes(query.get('stattrak'))))&&(!query.get('weapon')||p.weapon===query.get('weapon'))&&(!query.get('min')||p.price.amountMinor>=Number(query.get('min'))*100)&&(!query.get('max')||p.price.amountMinor<=Number(query.get('max'))*100));
+  const categoryCounts={all:matching.length,byCategory:{}};
+  for(const product of matching)categoryCounts.byCategory[product.categoryId]=(categoryCounts.byCategory[product.categoryId]??0)+1;
+  const selected=matching.filter(p=>!query.get('categoryId')||p.categoryId===query.get('categoryId'));
+  const sort=query.get('sort');if(['price_asc','price-asc'].includes(sort))selected.sort((a,b)=>a.price.amountMinor-b.price.amountMinor);if(['price_desc','price-desc'].includes(sort))selected.sort((a,b)=>b.price.amountMinor-a.price.amountMinor);if(['name_asc','name-asc'].includes(sort))selected.sort((a,b)=>a.title.localeCompare(b.title));if(['name_desc','name-desc'].includes(sort))selected.sort((a,b)=>b.title.localeCompare(a.title));
+  const offset=Number(query.get('offset')??0),limit=Number(query.get('limit')??60);
+  return send({items:selected.slice(offset,offset+limit),categoryCounts,facets:{kinds:[],games:[],productTypes:[],conditions:[],fulfillmentModes:[],availability:[]},pagination:{limit,offset,total:selected.length,hasMore:offset+limit<selected.length},pricing:{coinRate:{fiatCurrency:'RUB',fiatMinor:100,coinMinor:200,display:'2'}}});
+ }
+ if(url.pathname==='/duo/options')return send({items:items.filter(p=>p.categoryId===url.searchParams.get('slot')).slice(0,60),nextCursor:null});
+ if(url.pathname==='/duo/quotes'){const pair=[items.find(p=>p.slug===body.knifeSlug),items.find(p=>p.slug===body.gloveSlug)];if(pair.some(p=>!p))return send({},400);const totalCoinMinor=pair.reduce((s,p)=>s+p.price.amountMinor,0),totalRubMinor=Math.round(totalCoinMinor*5/8);return send({id:'fixture-quote',expiresAt:new Date(Date.now()+60000).toISOString(),items:pair,totalCoinMinor,totalRubMinor,budgetRubMinor:body.budgetRubMinor,remainingRubMinor:body.budgetRubMinor-totalRubMinor,withinBudget:totalRubMinor<=body.budgetRubMinor});}
+ if(url.pathname.startsWith('/catalog/'))return send(items.find(p=>p.slug===(aliases[decodeURIComponent(url.pathname.split('/').at(-1))]??decodeURIComponent(url.pathname.split('/').at(-1))))??{},items.some(p=>p.slug===(aliases[decodeURIComponent(url.pathname.split('/').at(-1))]??decodeURIComponent(url.pathname.split('/').at(-1))))?200:404);
+ return send({},404);
+}).listen(5204,'127.0.0.1',()=>process.stdout.write('Gems test fixture on 5204\n'));

@@ -1,0 +1,52 @@
+name: Gems CI
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: gems_test
+          POSTGRES_USER: gems_test
+          POSTGRES_PASSWORD: gems_test_local_only
+        ports: ['55462:5432']
+        options: >-
+          --health-cmd 'pg_isready -U gems_test -d gems_test'
+          --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - run: npm ci --prefix backend
+      - run: npm ci --prefix frontend
+      - run: npm run verify --prefix backend
+      - run: npm run test:integration --prefix backend
+        env:
+          GEMS_TEST_DATABASE_URL: postgres://gems_test:gems_test_local_only@127.0.0.1:55462/gems_test
+      - run: npm test --prefix frontend
+      - run: npm run typecheck --prefix frontend
+      - run: npm run lint --prefix frontend
+      - run: npm run api:check --prefix frontend
+      - run: npm run visual:source --prefix frontend
+      - run: npm run build --prefix frontend
+        env:
+          GEMS_BACKEND_ORIGIN: http://127.0.0.1:5204
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e --prefix frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gems-browser-evidence
+          path: |
+            frontend/test-results
+            .local/gems-acceptance
+          include-hidden-files: true
