@@ -1,19 +1,15 @@
 import {cache} from "react";
-import type { Catalog, Product } from './types';
-import {mapProduct,type CatalogPage,type CatalogApiProduct} from './catalog-adapter';
-import {categories,presentationSlugs,presentationProducts} from './presentation';
+import type { Product } from './types';
+import {mapProduct,type CatalogApiProduct} from './catalog-adapter';
+import {presentationProducts} from './presentation';
+import {loadCatalog,loadHomeProducts} from './catalog-source';
 const origin=()=>process.env.GEMS_BACKEND_ORIGIN??'http://127.0.0.1:5202';
 async function backend<T>(path:string,body?:unknown):Promise<T>{
  const response=await fetch(`${origin()}${path}`,{cache:'no-store',signal:AbortSignal.timeout(5000),...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})});
  if(!response.ok)throw new Error(`Catalog unavailable: ${response.status}`);return response.json() as Promise<T>;
 }
-export const getCatalog=cache(async ():Promise<Catalog>=>{
- try {
-  const [page,curated]=await Promise.all([backend<CatalogPage>('/catalog?limit=60'),backend<{items:CatalogApiProduct[]}>('/catalog/lookup',{slugs:presentationSlugs.slice(0,50)})]);
-  const products=[...new Map([...page.items,...curated.items].map(dto=>[dto.slug,mapProduct(dto)])).values()];
-  return {mode:'live',products,categories,capturedAt:new Date().toISOString()};
- }catch{return {mode:'unavailable',products:[],categories,capturedAt:''};}
-});
+export const getCatalog=cache(()=>loadCatalog(backend));
+export const getHomeProducts=cache(async()=>loadHomeProducts((await getCatalog()).products,backend));
 export async function getProduct(slug:string):Promise<Product|null>{
  try{return mapProduct(await backend<CatalogApiProduct>(`/catalog/${encodeURIComponent(slug)}`));}catch{return null;}
 }
