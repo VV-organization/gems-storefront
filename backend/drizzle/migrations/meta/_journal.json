@@ -302,6 +302,13 @@
       "when": 1792756800002,
       "tag": "0042_gems_multi_game",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1793912400000,
+      "tag": "0043_catalog_read_indexes",
+      "breakpoints": true
     }
   ]
 }

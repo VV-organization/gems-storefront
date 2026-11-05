@@ -75,3 +75,16 @@ for(const mode of ['normal','lookup-failure','page-failure','preferred-unavailab
  await page.getByRole('dialog').getByRole('link',{name:'Подробнее о предмете'}).click();
  await expect(page.locator('.product-detail')).toBeVisible();
 });
+
+
+test('temporary product failure offers retry instead of a false 404',async({page,request})=>{
+ await request.post('http://127.0.0.1:5204/__test/catalog-mode',{data:{mode:'normal'}});
+ await page.goto('/');await page.locator('.hero-find').last().click();
+ const href=await page.getByRole('dialog').getByRole('link',{name:'Подробнее о предмете'}).getAttribute('href');
+ await request.post('http://127.0.0.1:5204/__test/catalog-mode',{data:{mode:'detail-failure'}});
+ await page.goto(href!);await expect(page.getByRole('heading',{name:'Не удалось загрузить скин'})).toBeVisible();
+ await expect(page.getByText('404 / НЕ НАЙДЕНО')).toHaveCount(0);
+ await request.post('http://127.0.0.1:5204/__test/catalog-mode',{data:{mode:'normal'}});
+ await page.getByRole('button',{name:'Повторить',exact:true}).click();await expect(page.locator('.product-detail')).toBeVisible();
+ await page.goto('/catalog/non-existent-product');await expect(page.getByText('404 / НЕ НАЙДЕНО')).toBeVisible();
+});

@@ -263,6 +263,17 @@ export class CatalogService {
     @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {}
 
+  async preview(query: Pick<CatalogListQuery,'game'|'categoryId'|'status'|'limit'>):Promise<{items:CatalogProductDto[]}> {
+    const game=this.gameFilter(query);
+    const products=await this.loadProducts({
+      ...(game?{game}:{}),
+      ...(query.categoryId?{categoryId:query.categoryId}:{}),
+      availableOnly:query.status==='available',
+      limit:Math.min(60,limitQuery(query.limit)),
+    });
+    return {items:products.map(productDto)};
+  }
+
   async list(query: CatalogListQuery): Promise<CatalogListDto> {
     const category = allowedKinds.has(query.category as CatalogProductKind) ? query.category as CatalogProductKind : undefined;
     const types = arrayQuery(query.type).map(normalize);
@@ -536,7 +547,7 @@ ${supplierPricingJoin}
     }
     if (command.game !== undefined) {
       params.push(command.game);
-      where.push(`lower(coalesce(catalog_products.game, '')) = $${params.length}`);
+      where.push(`lower(catalog_products.game) = $${params.length}`);
     }
     if (command.slugs !== undefined) { params.push(command.slugs);where.push(`catalog_products.slug = ANY($${params.length}::text[])`); }
     if (command.slug !== undefined) {
@@ -620,6 +631,7 @@ ${supplierPricingJoin}
     types?: string[];
   }): Promise<CatalogListDto["categoryCounts"]> {
     const { params, where } = this.catalogWhere(command);
+    const needsSupplier=command.availableOnly||command.minPriceCoinMinor!==undefined||command.maxPriceCoinMinor!==undefined;
     if (command.minPriceCoinMinor !== undefined) {
       params.push(command.minPriceCoinMinor);
       where.push(`${effectivePriceCoinMinorSql} >= $${params.length}`);
@@ -632,12 +644,12 @@ ${supplierPricingJoin}
       `
         SELECT COALESCE(catalog_products.category_id, 'other') AS category_id, count(*)::text AS total
         FROM catalog_products
-        LEFT JOIN supplier_listings
+        ${needsSupplier?`LEFT JOIN supplier_listings
           ON catalog_products.supplier_provider = 'sih'
           AND supplier_listings.supplier = 'sih'
           AND supplier_listings.game = lower(catalog_products.game)
           AND supplier_listings.market_hash_name = catalog_products.supplier_item_id
-${supplierPricingJoin}
+${supplierPricingJoin}`:''}
         WHERE ${where.join("\n          AND ")}
         GROUP BY COALESCE(catalog_products.category_id, 'other')
       `,
@@ -678,15 +690,22 @@ ${supplierPricingJoin}
       condition_value: string | null;
     }>(
       `
-        SELECT DISTINCT
-          catalog_products.game,
-          catalog_products.product_type,
-          condition_specification.value ->> 'value' AS condition_value
-        FROM catalog_products
-        LEFT JOIN LATERAL jsonb_array_elements(coalesce(catalog_products.details -> 'specifications', '[]'::jsonb)) AS condition_specification(value)
-          ON lower(condition_specification.value ->> 'label') = 'состояние'
-        WHERE ${where.join("\n          AND ")}
-        ORDER BY catalog_products.game ASC, catalog_products.product_type ASC, condition_value ASC
+        SELECT DISTINCT game, product_type, condition_value FROM (
+          SELECT catalog_products.game, catalog_products.product_type,
+            CASE WHEN lower(catalog_products.game)='cs2'
+              THEN substring(catalog_products.supplier_item_id from '\\(([^()]+)\\)\\s*$')
+              ELSE NULL END AS condition_value
+          FROM catalog_products
+          WHERE ${where.join(" AND ")} AND catalog_products.supplier_provider='sih'
+          UNION ALL
+          SELECT catalog_products.game, catalog_products.product_type,
+            condition_specification.value ->> 'value' AS condition_value
+          FROM catalog_products
+          LEFT JOIN LATERAL jsonb_array_elements(coalesce(catalog_products.details -> 'specifications', '[]'::jsonb)) AS condition_specification(value)
+            ON lower(condition_specification.value ->> 'label') = 'состояние'
+          WHERE ${where.join(" AND ")} AND catalog_products.supplier_provider IS DISTINCT FROM 'sih'
+        ) AS facet_rows
+        ORDER BY game ASC, product_type ASC, condition_value ASC
       `,
       params,
     );

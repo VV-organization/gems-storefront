@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {loadCatalog,loadHomeProducts,type CatalogRequest} from '../src/lib/catalog-source.ts';
+import {loadCatalog,loadHomeProducts,loadProduct,type CatalogRequest} from '../src/lib/catalog-source.ts';
+import {CatalogRequestError} from '../src/lib/catalog-request.ts';
 import {mapProduct,type CatalogApiProduct} from '../src/lib/catalog-adapter.ts';
 import {homeSlotIds,presentationProducts} from '../src/lib/presentation.ts';
 
@@ -14,6 +15,19 @@ function request(handler:(path:string,body?:unknown)=>unknown):CatalogRequest {
 test('lookup failure preserves first page',async()=>{
  const catalog=await loadCatalog(request(path=>{if(path==='/catalog/lookup')throw Error('503');return {items:[dto('knife')]};}));
  assert.equal(catalog.mode,'live');assert.deepEqual(catalog.products,[products[0]]);
+});
+test('product transport errors are not reported as missing products',async()=>{
+ await assert.rejects(loadProduct('knife',request(()=>{throw new CatalogRequestError(503);})),/503/);
+ await assert.rejects(loadProduct('knife',request(()=>{throw new TypeError('network');})),/network/);
+ assert.equal(await loadProduct('missing',request(()=>{throw new CatalogRequestError(404);})),null);
+ assert.deepEqual(await loadProduct('live-knife',request(()=>dto('knife'))),products[0]);
+});
+test('initial catalog and missing home categories use item-only previews',async()=>{
+ const paths:string[]=[];
+ const req=request(path=>{paths.push(path);return {items:[]};});
+ await loadCatalog(req);await loadHomeProducts([],req);
+ assert.ok(paths.includes('/catalog/preview?limit=60'));
+ assert.ok(paths.filter(path=>path.includes('?')).every(path=>path.startsWith('/catalog/preview?')));
 });
 test('page failure preserves lookup, both failures mean unavailable',async()=>{
  const catalog=await loadCatalog(request(path=>{if(path!=='/catalog/lookup')throw Error('timeout');return {items:[dto('pistol')]};}));

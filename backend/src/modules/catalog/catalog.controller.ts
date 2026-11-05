@@ -72,6 +72,10 @@ export class CatalogController {
   @ApiOkResponse({schema:{type:"object",required:["items"],properties:{items:{type:"array",items:productSchema}}}})
   lookup(@Body() body:{slugs?:unknown}|null|undefined) { return this.catalog.lookup(body?.slugs); }
 
+  @Get("preview")
+  @ApiOkResponse({schema:{type:"object",required:["items"],properties:{items:{type:"array",items:productSchema}}}})
+  preview(@Query() query:CatalogListQuery) { return this.catalog.preview(query); }
+
   @ApiOkResponse({
     schema: {
       type: "object",

@@ -19,12 +19,13 @@ createServer(async(req,res)=>{const url=new URL(req.url,'http://127.0.0.1:5204')
  const items=mode==='empty'?[]:mode==='partial'?replacements.slice(1):mode==='replacements'?replacements:mode==='preferred-unavailable'?originalItems.map(p=>preferred.has(p.slug)?{...p,availability:'unavailable'}:p):originalItems;
  if(url.pathname.startsWith('/catalog')&&mode==='offline')return send({message:'Fixture unavailable'},503);
  if(url.pathname==='/catalog/lookup'&&mode==='lookup-failure')return send({},503);
- if(url.pathname==='/catalog'&&!url.searchParams.has('categoryId')&&mode==='page-failure')return send({},503);
+ if(['/catalog','/catalog/preview'].includes(url.pathname)&&!url.searchParams.has('categoryId')&&mode==='page-failure')return send({},503);
+ if(url.pathname.startsWith('/catalog/')&&!['/catalog/lookup','/catalog/preview'].includes(url.pathname)&&mode==='detail-failure')return send({},503);
  if(url.pathname==='/health/live')return send({status:'fixture'});
  if(url.pathname==='/storefront/config')return send(config);
  if(url.pathname==='/session/me')return send({message:'Guest'},401);
  if(url.pathname==='/catalog/lookup')return send({items:items.filter(p=>body.slugs.map(s=>aliases[s]??s).includes(p.slug))});
- if(url.pathname==='/catalog'){
+ if(url.pathname==='/catalog'||url.pathname==='/catalog/preview'){
   const query=url.searchParams;
   const wearCodes={'Прямо с завода':'FN','Немного поношенное':'MW','После полевых испытаний':'FT','Поношенное':'WW','Закалённое в боях':'BS','Закаленное в боях':'BS'};
   const pageItems=['replacements','partial'].includes(mode)&&!query.has('categoryId')?[]:items;

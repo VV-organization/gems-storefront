@@ -127,6 +127,21 @@ describe.skipIf(!databaseUrl)("catalog PostgreSQL persistence", () => {
     await pool.query("DELETE FROM catalog_products WHERE supplier_provider = 'sih' AND supplier_item_id = $1", [deagleMarketHashName]);
   });
 
+  it("serves item-only previews with live prices and preserves supplier condition facets", async () => {
+    await insertDeagleListing();
+    await pool.query("UPDATE supplier_listings SET last_seen_at=now() WHERE market_hash_name=$1",[deagleMarketHashName]);
+    await app.get(CatalogSupplierSyncService).promoteActiveSihListings("cs2");
+    const preview=await request(app.getHttpServer() as Parameters<typeof request>[0])
+      .get("/catalog/preview").query({game:"cs2",categoryId:"pistol",status:"available",limit:3}).expect(200);
+    const previewBody = preview.body as Pick<CatalogListDto, "items">;
+    expect(previewBody.items.some((item:{slug:string;availability:string})=>item.slug===deagleProjectedSlug&&item.availability==='available')).toBe(true);
+    expect(Object.keys(previewBody)).toEqual(['items']);
+    const full=await request(app.getHttpServer() as Parameters<typeof request>[0])
+      .get("/catalog").query({game:"cs2",q:"Printstream",limit:3}).expect(200);
+    expect((full.body as CatalogListDto).facets.conditions).toContainEqual({id:'Minimal Wear',title:'Minimal Wear'});
+    await request(app.getHttpServer() as Parameters<typeof request>[0]).get("/catalog/preview").query({game:"invalid"}).expect(400);
+  });
+
   it("serves provider-backed CS2 catalog rows promoted from active SIH listings", async () => {
     const seeded = await pool.query<{ total: string; gpt_total: string }>(
       "SELECT count(*) AS total, count(*) FILTER (WHERE kind = 'gpt') AS gpt_total FROM catalog_products",

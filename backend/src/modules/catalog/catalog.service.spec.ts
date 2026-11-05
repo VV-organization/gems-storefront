@@ -44,6 +44,22 @@ const appleRow = {
 };
 
 describe("CatalogService", () => {
+  it("loads previews without full catalog counts or facets", async () => {
+    const queries:string[]=[];
+    const service=new CatalogService({query:(sql:string)=>{queries.push(sql);return Promise.resolve({rows:[]});}} as never);
+    expect(await service.preview({game:'cs2',categoryId:'knife',status:'available',limit:'3'})).toEqual({items:[]});
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain('available_quantity > 0');
+    expect(queries[0]).not.toContain('SELECT DISTINCT');
+    expect(queries[0]).not.toContain('count(*)');
+  });
+
+  it("counts unfiltered categories without joining supplier prices", async () => {
+    const queries:string[]=[];
+    const service=new CatalogService({query:(sql:string)=>{queries.push(sql);return Promise.resolve({rows:[]});}} as never);
+    await service.list({game:'cs2'});
+    expect(queries.find(sql=>sql.includes('AS total'))).not.toContain('JOIN supplier_listings');
+  });
   function createService(row: Omit<typeof appleRow, "game"> & { game: string | null } = appleRow) {
     const database = {
       query<Row>(sql: string): Promise<QueryResult<Row>> {
