@@ -78,23 +78,21 @@ export class CatalogSupplierSyncService {
       const runId = run.rows[0]?.id;
       if (runId === undefined) throw new Error("CATALOG_SYNC_RUN_NOT_STORED");
 
-      for (const item of items) {
+      // Keep the snapshot atomic while avoiding tens of thousands of network round trips.
+      for (let offset = 0; offset < items.length; offset += 500) {
+        const batch = [...new Map(items.slice(offset, offset + 500).map(item => [item.marketHashName, item])).values()];
         await tx.query(
           `
             INSERT INTO supplier_listings (
-              supplier,
-              game,
-              market_hash_name,
-              active,
-              available_quantity,
-              price_microusd,
-              image_url,
-              snapshot,
-              first_seen_at,
-              last_seen_at,
-              last_sync_run_id
+              supplier, game, market_hash_name, active, available_quantity,
+              price_microusd, image_url, snapshot, first_seen_at, last_seen_at, last_sync_run_id
             )
-            VALUES ('sih', $1, $2, true, $3, $4, $5, $6, $7, $7, $8)
+            SELECT 'sih', $1, item.market_hash_name, true, item.available_quantity,
+              item.price_microusd::bigint, item.image_url, item.snapshot, $3, $3, $4
+            FROM jsonb_to_recordset($2::jsonb) AS item(
+              market_hash_name text, available_quantity integer, price_microusd text,
+              image_url text, snapshot jsonb
+            )
             ON CONFLICT (supplier, game, market_hash_name) DO UPDATE
             SET active = true,
                 available_quantity = EXCLUDED.available_quantity,
@@ -104,16 +102,13 @@ export class CatalogSupplierSyncService {
                 last_seen_at = EXCLUDED.last_seen_at,
                 last_sync_run_id = EXCLUDED.last_sync_run_id
           `,
-          [
-            item.game,
-            item.marketHashName,
-            item.availableQuantity,
-            item.priceMicrousd.toString(),
-            item.imageUrl,
-            snapshot(item),
-            observedAt,
-            runId,
-          ],
+          [command.game, JSON.stringify(batch.map(item => ({
+            market_hash_name: item.marketHashName,
+            available_quantity: item.availableQuantity,
+            price_microusd: item.priceMicrousd.toString(),
+            image_url: item.imageUrl,
+            snapshot: snapshot(item),
+          }))), observedAt, runId],
         );
       }
 
@@ -130,6 +125,7 @@ export class CatalogSupplierSyncService {
         [runId, command.game],
       );
       const promotedProductCount = await this.promoteSihGameListingsInTransaction(tx, command.game);
+      await tx.query("UPDATE catalog_sync_runs SET finished_at=clock_timestamp() WHERE id=$1", [runId]);
 
       return {
         game: command.game,
@@ -202,6 +198,7 @@ export class CatalogSupplierSyncService {
         WHERE supplier_provider = 'sih'
           AND kind = 'skins'
           AND lower(game) = $1
+          AND public_enabled = true
           AND supplier_item_id NOT IN (
             SELECT market_hash_name
             FROM supplier_listings
@@ -255,6 +252,11 @@ export class CatalogSupplierSyncService {
               supplier_snapshot = $14::jsonb,
               supplier_fresh_at = $15,
               public_enabled = $16,
+              category_id = $18,
+              condition_code = $19,
+              weapon = $20,
+              stattrak = $21,
+              ever_published = ever_published OR $16,
               updated_at = clock_timestamp()
           WHERE supplier_provider = 'sih'
             AND supplier_item_id = $1
@@ -278,6 +280,7 @@ export class CatalogSupplierSyncService {
           listing.last_seen_at,
           publicEnabled,
           game,
+          normalized.categoryId, normalized.condition, normalized.weapon, normalized.stattrak,
         ],
       );
 
@@ -307,10 +310,11 @@ export class CatalogSupplierSyncService {
               supplier_snapshot,
               supplier_fresh_at,
               public_enabled,
+              category_id, condition_code, weapon, stattrak, ever_published,
               created_at,
               updated_at
             )
-            VALUES ($1, $2, 'skins', $3, $4, $5, $6, $7, 1, 'available', 'steam-trade', $8, $9, $10, $11, $12, $13::jsonb, 'sih', $14, $15::jsonb, $16, $17, clock_timestamp(), clock_timestamp())
+            VALUES ($1, $2, 'skins', $3, $4, $5, $6, $7, 1, 'available', 'steam-trade', $8, $9, $10, $11, $12, $13::jsonb, 'sih', $14, $15::jsonb, $16, $17, $18, $19, $20, $21, $17, clock_timestamp(), clock_timestamp())
             ON CONFLICT (id) DO UPDATE
             SET category = EXCLUDED.category,
                 game = EXCLUDED.game,
@@ -328,6 +332,11 @@ export class CatalogSupplierSyncService {
                 supplier_snapshot = EXCLUDED.supplier_snapshot,
                 supplier_fresh_at = EXCLUDED.supplier_fresh_at,
                 public_enabled = EXCLUDED.public_enabled,
+                category_id = EXCLUDED.category_id,
+                condition_code = EXCLUDED.condition_code,
+                weapon = EXCLUDED.weapon,
+                stattrak = EXCLUDED.stattrak,
+                ever_published = catalog_products.ever_published OR EXCLUDED.ever_published,
                 updated_at = clock_timestamp()
           `,
           [
@@ -348,10 +357,10 @@ export class CatalogSupplierSyncService {
             JSON.stringify(listing.snapshot),
             listing.last_seen_at,
             publicEnabled,
+            normalized.categoryId, normalized.condition, normalized.weapon, normalized.stattrak,
           ],
         );
       }
-      await tx.query(`UPDATE catalog_products SET category_id=$1, condition_code=$2, weapon=$3, stattrak=$4, ever_published=ever_published OR $5 WHERE supplier_provider='sih' AND supplier_item_id=$6 AND lower(game)=$7`,[normalized.categoryId,normalized.condition,normalized.weapon,normalized.stattrak,publicEnabled,listing.market_hash_name,game]);
       if (publicEnabled) promotedProductCount += 1;
     }
 

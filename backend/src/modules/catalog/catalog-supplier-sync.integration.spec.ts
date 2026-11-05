@@ -173,6 +173,39 @@ describe.skipIf(!databaseUrl)("catalog supplier sync persistence", () => {
     ]);
   });
 
+  it("keeps batch boundaries, duplicate last-write semantics and exact bigint prices", async () => {
+    const sync = app.get(CatalogSupplierSyncService);
+    const observedAt = new Date("2026-11-06T00:00:00Z");
+    const items: SihSupplierItem[] = Array.from({length:501},(_,index)=>({
+      game:"cs2",marketHashName:`Sync Batch ${index}`,availableQuantity:0,
+      priceMicrousd:1000000n,imageUrl:null,
+    }));
+    const first = items[0];
+    if (!first) throw new Error("Missing batch fixture");
+    await sync.syncSihGame({game:"cs2",observedAt,client:{getItems:()=>Promise.resolve([
+      first,...items,{...first,priceMicrousd:9007199254740993n},
+    ])}});
+    const result = await pool.query<{total:string}>("SELECT count(*)::text AS total FROM supplier_listings WHERE game='cs2'");
+    expect(result.rows[0]?.total).toBe("501");
+    const row = await pool.query<{price:string;last_seen_at:Date;active:boolean}>(
+      "SELECT price_microusd::text AS price,last_seen_at,active FROM supplier_listings WHERE market_hash_name=$1",[first.marketHashName],
+    );
+    expect(row.rows[0]).toEqual({price:"9007199254740993",last_seen_at:observedAt,active:true});
+  });
+
+  it("updates normalized fields without replacing a legacy product identity or publication history", async () => {
+    const sync = app.get(CatalogSupplierSyncService);
+    const item:SihSupplierItem={game:"cs2",marketHashName:"AK-47 | Redline (Field-Tested)",availableQuantity:1,priceMicrousd:1000000n,imageUrl:null};
+    const client={getItems:()=>Promise.resolve([item])};
+    await sync.syncSihGame({game:"cs2",client});
+    await pool.query("UPDATE catalog_products SET id='test-sync-legacy-id',slug='test-sync-legacy-slug',category_id=NULL,condition_code=NULL,weapon=NULL,ever_published=true WHERE supplier_provider='sih' AND supplier_item_id=$1",[item.marketHashName]);
+    await sync.syncSihGame({game:"cs2",client});
+    const result=await pool.query<{id:string;slug:string;category_id:string;condition_code:string;weapon:string;ever_published:boolean;public_enabled:boolean}>(
+      "SELECT id,slug,category_id,condition_code,weapon,ever_published,public_enabled FROM catalog_products WHERE supplier_provider='sih' AND supplier_item_id=$1",[item.marketHashName],
+    );
+    expect(result.rows).toEqual([{id:"test-sync-legacy-id",slug:"test-sync-legacy-slug",category_id:"rifle",condition_code:"FT",weapon:"AK-47",ever_published:true,public_enabled:false}]);
+  });
+
   it("rejects unsupported games before contacting SIH", async () => {
     const sync = app.get(CatalogSupplierSyncService);
     await expect(sync.syncSihGame({game: "dota2" as never, client: {getItems: () => Promise.reject(new Error("unexpected supplier call"))}})).rejects.toThrow("CATALOG_GAME_UNSUPPORTED");
