@@ -1,3 +1,8 @@
 /* Live descriptions can be longer than designer samples. Keep the original grid. */
 .skin-specs > div { min-width: 0; }
 .skin-specs strong { overflow-wrap: anywhere; }
+
+/* Keep guest email inside the shared options row, with readable field styling. */
+.steam-email{margin-top:24px}
+.steam-email .text-input{background:transparent;border:0;border-bottom:1px solid var(--line);padding:14px 0}
+.steam-email .fine-print{margin-top:8px}
