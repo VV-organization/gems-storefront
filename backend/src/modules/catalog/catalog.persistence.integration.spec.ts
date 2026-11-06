@@ -136,6 +136,17 @@ describe.skipIf(!databaseUrl)("catalog PostgreSQL persistence", () => {
     const previewBody = preview.body as Pick<CatalogListDto, "items">;
     expect(previewBody.items.some((item:{slug:string;availability:string})=>item.slug===deagleProjectedSlug&&item.availability==='available')).toBe(true);
     expect(Object.keys(previewBody)).toEqual(['items']);
+    const deagle=previewBody.items.find(item=>item.slug===deagleProjectedSlug);
+    if(!deagle)throw new Error('Expected an available Desert Eagle in preview');
+    const weapons=await request(app.getHttpServer() as Parameters<typeof request>[0]).get('/catalog/comparison-weapons').expect(200);
+    expect((weapons.body as {weapons:string[]}).weapons).toContain(deagle.weapon);
+    const underPrice=await request(app.getHttpServer() as Parameters<typeof request>[0])
+      .get('/catalog/preview').query({game:'cs2',weapon:deagle.weapon,max:(deagle.price.amountMinor-1)/100,status:'available',sort:'price_desc',limit:60}).expect(200);
+    const underItems=(underPrice.body as Pick<CatalogListDto,'items'>).items;
+    expect(underItems.every(item=>item.weapon===deagle.weapon&&item.price.amountMinor<deagle.price.amountMinor)).toBe(true);
+    const samePrice=await request(app.getHttpServer() as Parameters<typeof request>[0])
+      .get('/catalog/preview').query({game:'cs2',weapon:deagle.weapon,min:deagle.price.amountMinor/100,max:deagle.price.amountMinor/100,status:'available',limit:60}).expect(200);
+    expect((samePrice.body as Pick<CatalogListDto,'items'>).items.some(item=>item.slug===deagleProjectedSlug)).toBe(true);
     const full=await request(app.getHttpServer() as Parameters<typeof request>[0])
       .get("/catalog").query({game:"cs2",q:"Printstream",limit:3}).expect(200);
     expect((full.body as CatalogListDto).facets.conditions).toContainEqual({id:'Minimal Wear',title:'Minimal Wear'});

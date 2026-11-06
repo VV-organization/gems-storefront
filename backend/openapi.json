@@ -1110,6 +1110,38 @@
         ]
       }
     },
+    "/catalog/comparison-weapons": {
+      "get": {
+        "operationId": "CatalogController_comparisonWeapons",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "weapons"
+                  ],
+                  "properties": {
+                    "weapons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
     "/catalog/preview": {
       "get": {
         "operationId": "CatalogController_preview",

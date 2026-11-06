@@ -263,11 +263,30 @@ export class CatalogService {
     @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {}
 
-  async preview(query: Pick<CatalogListQuery,'game'|'categoryId'|'status'|'limit'>):Promise<{items:CatalogProductDto[]}> {
+  async comparisonWeapons():Promise<{weapons:string[]}> {
+    // Published CS2 taxonomy is independent of paged offers. Stock is checked by preview.
+    const result=await this.database.query<{weapon:string}>(`
+      SELECT DISTINCT weapon FROM catalog_products
+      WHERE public_enabled = true AND kind = 'skins' AND lower(game) = 'cs2'
+        AND category_id IS NOT NULL AND weapon IS NOT NULL AND btrim(weapon) <> ''
+      ORDER BY weapon ASC
+    `);
+    return {weapons:result.rows.map(row=>row.weapon)};
+  }
+
+  async preview(query: CatalogListQuery):Promise<{items:CatalogProductDto[]}> {
     const game=this.gameFilter(query);
+    const min=numberQuery(query.min),max=numberQuery(query.max);
+    const low=min!==undefined&&max!==undefined?Math.min(min,max):min;
+    const high=min!==undefined&&max!==undefined?Math.max(min,max):max;
     const products=await this.loadProducts({
       ...(game?{game}:{}),
       ...(query.categoryId?{categoryId:query.categoryId}:{}),
+      ...(typeof query.weapon==='string'?{weapon:query.weapon}:{}),
+      ...(low===undefined?{}:{minPriceCoinMinor:decimalMinor(String(low))}),
+      ...(high===undefined?{}:{maxPriceCoinMinor:decimalMinor(String(high))}),
+      sort:sortQuery(query.sort),
+      offset:offsetQuery(query.offset),
       availableOnly:query.status==='available',
       limit:Math.min(60,limitQuery(query.limit)),
     });

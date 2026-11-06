@@ -6,3 +6,7 @@
 .steam-email{margin-top:24px}
 .steam-email .text-input{background:transparent;border:0;border-bottom:1px solid var(--line);padding:14px 0}
 .steam-email .fine-print{margin-top:8px}
+
+/* VV-171: contrast of converter arrows and spacing in email confirmation. */
+.home .convert-icon{color:#000}
+.email-confirmation-form>.button{margin-top:20px}

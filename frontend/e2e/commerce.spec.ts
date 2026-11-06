@@ -72,7 +72,7 @@ test('guest Steam needs contact email, no sign-in or OTP; unknown creation survi
 });
 test('Steam-only login and contact confirmation lives outside trade URL',async({page})=>{
  await fixture(page);await page.goto('/account');await expect(page.locator('.trade-panel').getByText('Подтвердить почту')).toHaveCount(0);await expect(page.locator('.contact-panel')).toContainText('owner@example.test');
- await page.route('**/api/session/me',route=>route.fulfill({status:401,body:'{}'}));await page.reload();await settled(page.getByRole('button',{name:'Открыть кабинет',exact:true}));await expect(page.getByRole('dialog').getByRole('link',{name:'Войти через Steam'})).toBeVisible();await expect(page.getByText('Войти по почте',{exact:true})).toBeVisible();
+ await page.route('**/api/session/me',route=>route.fulfill({status:401,body:'{}'}));await page.reload();await settled(page.getByRole('button',{name:'Открыть кабинет',exact:true}));await expect(page.getByRole('dialog').getByRole('link',{name:'Войти через Steam'})).toBeVisible();await expect(page.getByText('Войти по почте',{exact:true})).toHaveCount(0);
 });
 test('wrong payment owner gets no details and cannot create another session from return page',async({page})=>{
  const state=await fixture(page);await page.route(`**/api/payments/sessions/${sessionId}`,route=>route.fulfill({status:404,body:'{}'}));await page.goto(`http://127.0.0.1:5203/payments/return?session=${sessionId}&payment=success`);await expect(page.getByText('Платёж не найден или принадлежит другому аккаунту.')).toBeVisible();expect(state.paymentCalls).toBe(0);

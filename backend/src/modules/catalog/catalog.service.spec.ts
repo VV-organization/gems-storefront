@@ -44,6 +44,30 @@ const appleRow = {
 };
 
 describe("CatalogService", () => {
+  it("loads comparison weapon names independently of product pages", async () => {
+    let sql='';
+    const service=new CatalogService({query:(query:string)=>{sql=query;return Promise.resolve({rows:[{weapon:'AK-47'},{weapon:'Glock-18'}]});}} as never);
+    expect(await service.comparisonWeapons()).toEqual({weapons:['AK-47','Glock-18']});
+    expect(sql).toContain('SELECT DISTINCT weapon');
+    expect(sql).toContain("lower(game) = 'cs2'");
+    expect(sql).toContain('public_enabled = true');
+    expect(sql).not.toContain('supplier_listings');
+  });
+
+  it("applies weapon, price and pagination filters to previews without facets", async () => {
+    const calls:{sql:string;params:unknown[]}[]=[];
+    const service=new CatalogService({query:(sql:string,params:unknown[])=>{calls.push({sql,params});return Promise.resolve({rows:[]});}} as never);
+    const query={game:'cs2',weapon:'AK-47',max:'10000',sort:'price_desc',offset:'60',limit:'60',status:'available'};
+    await service.preview(query);
+    expect(calls).toHaveLength(1);
+    const call=calls[0];
+    if(!call)throw new Error('Expected preview query');
+    expect(call.params).toContain('AK-47');
+    expect(call.params).toContain(1000000);
+    expect(call.params.slice(-2)).toEqual([60,60]);
+    expect(call.sql).toContain('DESC, catalog_products.id ASC');
+    expect(call.sql).not.toContain('count(*)');
+  });
   it("loads previews without full catalog counts or facets", async () => {
     const queries:string[]=[];
     const service=new CatalogService({query:(sql:string)=>{queries.push(sql);return Promise.resolve({rows:[]});}} as never);

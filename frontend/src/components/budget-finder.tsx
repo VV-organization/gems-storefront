@@ -4,24 +4,25 @@ import {useState} from 'react';
 import type {Category,Product} from '@/lib/types';
 import {formatMinor,parseAmount,rubToGems} from '@/lib/money';
 import {useRemote} from '@/lib/use-remote';
-import {mapProduct,type CatalogPage} from '@/lib/catalog-adapter';
+import {mapProduct} from '@/lib/catalog-adapter';
+import {previewClient,type CatalogPreview} from '@/lib/catalog-preview';
 import {MotionHeading} from './motion';
 import {ProductCard} from './products';
 
 const budgetPresets=[5000,10000,25000,50000];
 const rubles=(major:number)=>major*100;
 
-export function BudgetFinder({products,categories}:{products:Product[];categories:Category[]}){
+export function BudgetFinder({categories}:{products:Product[];categories:Category[]}){
   const [amount,setAmount]=useState('10 000');
   const [category,setCategory]=useState('all');
   const parsedAmount=parseAmount(amount);
   const maxBudget=rubles(50000);
   const sliderValue=Math.max(rubles(500),Math.min(maxBudget,parsedAmount??rubles(10000)));
   const query=new URLSearchParams({game:'cs2',status:'available',limit:'6',sort:'price_desc',max:parsedAmount===null?'0':String(rubToGems(parsedAmount)/100)});if(category!=='all')query.set('categoryId',category);
-  const page=useRemote<CatalogPage>(parsedAmount!==null&&parsedAmount>0?`/catalog?${query}`:null,null);
-  const result={items:page.data?.items.map(mapProduct)??[],count:page.data?.pagination.total??0,invalidBudget:amount.trim()!==''&&(parsedAmount===null||parsedAmount<=0)};
+  const page=useRemote<CatalogPreview>(parsedAmount!==null&&parsedAmount>0?`/catalog/preview?${query}`:null,null,previewClient);
+  const result={items:page.data?.items.map(mapProduct)??[],count:page.data?.items.length??0,invalidBudget:amount.trim()!==''&&(parsedAmount===null||parsedAmount<=0)};
   const visibleCategories=categories;
-  const status=page.error|| (page.loading?'Ищем предметы…':result.invalidBudget?'Укажи сумму в рублях, например 10 000.':parsedAmount===null?'Введи бюджет, чтобы увидеть подходящие скины.':result.count===0?'В эту сумму пока ничего не попадает. Увеличь лимит или выбери другую категорию.':`${result.count>6?`Показаны 6 из ${result.count}`:`Найдено ${result.count}`} предметов в бюджете.`);
+  const status=page.error|| (page.loading?'Ищем предметы…':result.invalidBudget?'Укажи сумму в рублях, например 10 000.':parsedAmount===null?'Введи бюджет, чтобы увидеть подходящие скины.':result.count===0?'В эту сумму пока ничего не попадает. Увеличь лимит или выбери другую категорию.':`Подобрано ${result.count} предметов в бюджете.`);
 
   return <section className="budget-finder section" id="budget" aria-labelledby="budget-title">
     <div className="section-heading">
@@ -52,9 +53,10 @@ export function BudgetFinder({products,categories}:{products:Product[];categorie
       <div className="budget-results">
         <div className="budget-results-head">
           <p id="budget-status" role={result.invalidBudget?'alert':'status'} aria-live="polite" aria-atomic="true">{status}</p>
+          {page.error&&<button className="button secondary" onClick={page.reload}>Повторить</button>}
           {parsedAmount!==null&&result.count>0&&<span>Ближе к твоему лимиту</span>}
         </div>
-        {result.items.length>0?<div className="product-grid">{result.items.map(product=><ProductCard key={product.id} product={product}/>)}</div>:<div className="budget-empty"><span aria-hidden="true">↗</span><p>{products.length===0?'Каталог временно недоступен.':'Попробуй изменить сумму или категорию.'}</p></div>}
+        {result.items.length>0?<div className="product-grid">{result.items.map(product=><ProductCard key={product.id} product={product}/>)}</div>:<div className="budget-empty"><span aria-hidden="true">↗</span><p>{status}</p></div>}
       </div>
     </div>
   </section>;

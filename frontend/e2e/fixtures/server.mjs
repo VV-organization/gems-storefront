@@ -20,10 +20,11 @@ createServer(async(req,res)=>{const url=new URL(req.url,'http://127.0.0.1:5204')
  if(url.pathname.startsWith('/catalog')&&mode==='offline')return send({message:'Fixture unavailable'},503);
  if(url.pathname==='/catalog/lookup'&&mode==='lookup-failure')return send({},503);
  if(['/catalog','/catalog/preview'].includes(url.pathname)&&!url.searchParams.has('categoryId')&&mode==='page-failure')return send({},503);
- if(url.pathname.startsWith('/catalog/')&&!['/catalog/lookup','/catalog/preview'].includes(url.pathname)&&mode==='detail-failure')return send({},503);
+ if(url.pathname.startsWith('/catalog/')&&!['/catalog/lookup','/catalog/preview','/catalog/comparison-weapons'].includes(url.pathname)&&mode==='detail-failure')return send({},503);
  if(url.pathname==='/health/live')return send({status:'fixture'});
  if(url.pathname==='/storefront/config')return send(config);
  if(url.pathname==='/session/me')return send({message:'Guest'},401);
+ if(url.pathname==='/catalog/comparison-weapons')return send({weapons:[...new Set(items.filter(p=>p.game==='cs2').map(p=>p.weapon))].sort()});
  if(url.pathname==='/catalog/lookup')return send({items:items.filter(p=>body.slugs.map(s=>aliases[s]??s).includes(p.slug))});
  if(url.pathname==='/catalog'||url.pathname==='/catalog/preview'){
   const query=url.searchParams;

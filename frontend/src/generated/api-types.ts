@@ -159,6 +159,7 @@ export type ApiResponses = {"/duo/options": {get: {"items": Array<{"categoryId":
 "fulfillment": {"title": string;
 "description": string;
 "requirements": Array<string>;};};}>;};};
+"/catalog/comparison-weapons": {get: {"weapons": Array<string>;};};
 "/catalog/preview": {get: {"items": Array<{"categoryId": string;
 "condition": string;
 "weapon": string;
