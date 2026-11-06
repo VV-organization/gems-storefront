@@ -44,6 +44,15 @@ const appleRow = {
 };
 
 describe("CatalogService", () => {
+  it("bounds preview IDs before loading full product documents", async () => {
+    let sql='';
+    const service=new CatalogService({query:(query:string)=>{sql=query;return Promise.resolve({rows:[]});}} as never);
+    await service.preview({game:'cs2',status:'available',max:'20000',sort:'price_desc',limit:'6'});
+    expect(sql).toContain('WITH preview_products AS MATERIALIZED');
+    expect(sql.indexOf('LIMIT')).toBeLessThan(sql.indexOf('catalog_products.description'));
+    expect(sql).toContain('JOIN preview_products ON preview_products.id = catalog_products.id');
+  });
+
   it("loads comparison weapon names independently of product pages", async () => {
     let sql='';
     const service=new CatalogService({query:(query:string)=>{sql=query;return Promise.resolve({rows:[{weapon:'AK-47'},{weapon:'Glock-18'}]});}} as never);

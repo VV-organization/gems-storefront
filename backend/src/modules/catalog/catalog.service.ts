@@ -57,6 +57,14 @@ const supplierPricingJoin = `
           LIMIT 1
         ) AS active_pricing_settings ON supplier_listings.price_microusd IS NOT NULL
 `;
+const supplierOfferJoin = `
+        LEFT JOIN supplier_listings
+          ON catalog_products.supplier_provider = 'sih'
+          AND supplier_listings.supplier = 'sih'
+          AND supplier_listings.game = lower(catalog_products.game)
+          AND supplier_listings.market_hash_name = catalog_products.supplier_item_id
+${supplierPricingJoin}
+`;
 const supplierQuotedCoinMinorSql = `
           (
             (
@@ -286,6 +294,7 @@ export class CatalogService {
       ...(low===undefined?{}:{minPriceCoinMinor:decimalMinor(String(low))}),
       ...(high===undefined?{}:{maxPriceCoinMinor:decimalMinor(String(high))}),
       sort:sortQuery(query.sort),
+      previewSelection:true,
       offset:offsetQuery(query.offset),
       availableOnly:query.status==='available',
       limit:Math.min(60,limitQuery(query.limit)),
@@ -398,6 +407,7 @@ export class CatalogService {
   }
 
   private async loadProducts(command: {
+    previewSelection?:boolean;
     categoryId?: string; stattrak?: string; weapon?: string; availableOnly?: boolean;
     after?: {price:number;id:string};
     category?: CatalogProductKind;
@@ -449,6 +459,16 @@ export class CatalogService {
       }
       return "catalog_products.popularity DESC, catalog_products.created_at DESC, catalog_products.id ASC";
     })();
+    const previewSelection=command.previewSelection?`
+      WITH preview_products AS MATERIALIZED (
+        SELECT catalog_products.id
+        FROM catalog_products
+${supplierOfferJoin}
+        WHERE ${where.join(' AND ')}
+        ORDER BY ${orderBy}
+        LIMIT $${limitParam} OFFSET $${offsetParam}
+      )
+    `:'';
     const result = await client.query<{
       id: string;
       slug: string;
@@ -473,6 +493,7 @@ export class CatalogService {
       category_id:string|null; condition_code:string|null; weapon:string|null; stattrak:boolean; supplier_item_id:string|null; pricing_setting_id:string|null;
     }>(
       `
+${previewSelection}
         SELECT
           catalog_products.id,
           catalog_products.slug,
@@ -496,16 +517,11 @@ export class CatalogService {
           catalog_products.details,
           supplier_listings.price_microusd::text AS supplier_price_microusd
         FROM catalog_products
-        LEFT JOIN supplier_listings
-          ON catalog_products.supplier_provider = 'sih'
-          AND supplier_listings.supplier = 'sih'
-          AND supplier_listings.game = lower(catalog_products.game)
-          AND supplier_listings.market_hash_name = catalog_products.supplier_item_id
-${supplierPricingJoin}
-        WHERE ${where.join("\n          AND ")}
+${command.previewSelection?'JOIN preview_products ON preview_products.id = catalog_products.id':''}
+${supplierOfferJoin}
+        WHERE ${command.previewSelection?'true':where.join("\n          AND ")}
         ORDER BY ${orderBy}
-        LIMIT $${limitParam}
-        OFFSET $${offsetParam}
+        ${command.previewSelection?'':`LIMIT $${limitParam} OFFSET $${offsetParam}`}
       `,
       params,
     );
