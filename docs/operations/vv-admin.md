@@ -62,6 +62,11 @@ type `steam_store`, payment provider `disconnected`. До установки п�
 manifest запись держать неактивной. После deploy обновить manifest через audited
 API, затем активировать сайт с текущим expectedConfigurationVersion.
 
+Manifest refresh сохраняет уже заданные интервалы существующих checks. После
+refresh прочитать operations overview и через штатный schedule API выставить
+300 секунд для каждого enabled check; в частности, старые defaults могут
+оставлять backend/frontend/postgres/redis с интервалом 60 секунд.
+
 Не устанавливать webhook credentials и не отправлять исторический outbox для
 подключения мониторинга. Объявленная commerce schema 2 соответствует существующим
 payload, но не является подтверждением подключения доставки событий.

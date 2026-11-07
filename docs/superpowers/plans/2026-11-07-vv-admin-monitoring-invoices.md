@@ -64,7 +64,7 @@ docs/operations/vv-admin.md, docs/testing/vv-admin-verification.md.
 - [x] `npm run verify` — exit 0, включая неизменность designer source.
 - [x] Полный isolated DB suite — exit 0; явно отметить внешний SIH sandbox skip.
 - [x] Независимое ревью и нормализация compiled manifest текущим VV parser.
-- [ ] Проверить diff/status, сохранить только task-owned paths, commit;
+- [x] Проверить diff/status, сохранить только task-owned paths, commit;
   push текущей ветки и fast-forward release в main штатным способом.
 
 ## 3. Подключение production мониторинга
@@ -73,15 +73,15 @@ docs/operations/vv-admin.md, docs/testing/vv-admin-verification.md.
 - [x] Через audited VV API создать Gems (getsgems.com, host191.101.81.20,
   steam_store, provider disconnected) неактивным до установки manifest.
 - [x] Не изменять runtime env и credentials: все публикуемые проверки read-only.
-- [ ] Дождаться CI/deploy exact SHA, проверить public manifest/health и containers.
-- [ ] Refresh manifest; activate site; дождаться реальных scheduled worker runs,
+- [x] Дождаться CI/deploy exact SHA, проверить public manifest/health и containers.
+- [x] Refresh manifest; activate site; дождаться реальных scheduled worker runs,
   затем проверить все 8 manual checks с сохранёнными IDs. Не запускать платёжный flow.
-- [ ] Проверить UI сайта/операций и честную недоступность user payment test.
+- [x] Проверить UI сайта/операций и честную недоступность user payment test.
 
 ## 4. Финальная приёмка
 
-- [ ] /invoices/sites: Gems недоступен для генерации; invoiceProfile=null,
+- [x] /invoices/sites: Gems недоступен для генерации; invoiceProfile=null,
   catalog capability отсутствует, новые документы не создавались.
-- [ ] Финальные financial counts неизменны; записать evidence и точные skipped/deferred
+- [x] Финальные financial counts неизменны; записать evidence и точные skipped/deferred
   проверки. Инвойсы deferred по указанию пользователя; оплата не проверяется как
   успешная при отсутствующей конфигурации ArcoPay.

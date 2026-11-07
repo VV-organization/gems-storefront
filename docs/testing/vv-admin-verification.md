@@ -52,8 +52,50 @@ GitNexus query/impact для Gems вернули repository not found. Выпо�
 
 ## Production-приёмка
 
-Ожидает release exact SHA, CI/deploy, сохранённых worker/manual run IDs и
-браузерной проверки. Локальные проверки не означают завершённого подключения.
+- Code release `5fb75a132a15d72209d48db25bcbcd90720c4eb8`, штатный
+  [deploy 42386629557](https://github.com/VV-organization/gems-storefront/actions/runs/42386629557)
+  — success. Runtime compiled hashes API и VV dispatcher совпали с релизом.
+- При переключении контейнеров наблюдался краткий HTTP 502; после завершения
+  deploy все восемь GET вернули 200, в том числе при запросе с хоста VV Admin.
+  Десять services running, restarts=0; API/PG/Redis healthy, migration exit0.
+- Manifest refresh и activation выполнены через authenticated audited VV API.
+  Site `cmw6jy1vw001d0jobyes4p6yd`, configurationVersion=6, active=true,
+  provider disconnected. Восемь enabled checks, все intervalSeconds=300.
+- Админка сохранила старый default 60 секунд для четырёх базовых checks:
+  backend/frontend/postgres/redis. Их расписания выставлены в 300 через штатный
+  audited schedule API. Три неиспользуемых default checks disabled, без run history.
+- Automatic runs: 15:33:59–15:34:02 UTC, все healthy/HTTP200. До этого не было
+  manual-run audit; worker log: `ran 8 due checks for 16 sites`.
+- Manual runs: 15:34:29–15:34:33 UTC, все healthy/HTTP200; backend запущен кнопкой
+  в Chrome, остальные семь через audited API. Подтверждены восемь manual audits.
+
+| Check | Automatic run ID | Manual run ID |
+| --- | --- | --- |
+| backend_http | `cmw6kczcg00vy0jmxg3b7b6f5` | `cmw6kdlvy00320job3i42doz5` |
+| catalog_cs2 | `cmw6kd0gp00w30jmxma75svxq` | `cmw6kdoas00360jobfriodjls` |
+| catalog_pricing | `cmw6kd0i400w40jmxn6yuekjd` | `cmw6kdoc200380job7y4n04y3` |
+| catalog_rust | `cmw6kd10600w50jmx2j1day2e` | `cmw6kdogx003a0jobfzlcs2ea` |
+| catalog_tf2 | `cmw6kd14400w60jmx459aj172` | `cmw6kdolw003c0job1rn3pnpd` |
+| frontend_http | `cmw6kd1fy00w70jmxrjs7v3m0` | `cmw6kdouc003e0jobnzbobxqm` |
+| postgres | `cmw6kd1gw00w80jmxk8pwus4w` | `cmw6kdov9003g0jobbnl86ovz` |
+| redis | `cmw6kd1ho00w90jmx7skq51nf` | `cmw6kdowg003i0jobzsj4abb9` |
+
+- Browser: карточка Gems показывает «Работает» и восемь успешных checks;
+  screenshot просмотрен. Console warn/error отсутствуют. Пользовательский тест
+  не предлагает платёжный сценарий. В форме инвойсов Gems отсутствует в списке
+  доступных сайтов и отображается среди неподключённых с объяснением.
+- `/invoices/sites`: invoiceAvailable=false, profile=null; manifest без catalog
+  и storeOrders. Существующих инвойсов по-прежнему 3; новый документ не создавался.
+- Public unsigned legacy POST — HTTP401. Signed HTTP refusal/no-write проверен
+  локально; production secret для этой проверки не устанавливался.
+- Capabilities четыре false, ArcoPay disabled/not configured. Orders/topups/
+  steam/wallet/ledger/notifications/fulfillment/commerceoutbox до и после — все 0.
+  Runtime env и credentials не менялись. Bounded logs восьми backend services —
+  без error/cycleFailed/DI errors после рестарта.
+- GitHub CI exact SHA: [main 42386629533](https://github.com/VV-organization/gems-storefront/actions/runs/42386629533)
+  и [feature 42386629686](https://github.com/VV-organization/gems-storefront/actions/runs/42386629686)
+  — success. Browser e2e: 86 passed, 0 skipped, 0 failed (2.3 минуты).
+  Внешний SIH sandbox намеренно не запускался.
 
 ## Отложено
 
