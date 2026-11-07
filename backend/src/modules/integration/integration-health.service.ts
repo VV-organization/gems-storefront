@@ -11,6 +11,8 @@ export type IntegrationHealthResult = {
   readonly status: "ok" | "down";
   readonly reasons?: readonly string[];
   readonly total?: number;
+  readonly available?: number;
+  readonly snapshotAgeSeconds?: number | null;
   readonly byGame?: Partial<Record<CatalogGame, number>>;
 };
 
@@ -48,7 +50,10 @@ export class IntegrationHealthService {
       connectTimeout: 2000,
       lazyConnect: true,
       maxRetriesPerRequest: 0,
+      commandTimeout: 2000,
+      retryStrategy: () => null,
     });
+    client.on("error", () => undefined);
     try {
       await client.connect();
       await client.ping();
@@ -105,18 +110,60 @@ export class IntegrationHealthService {
       : { status: "down", total, byGame, reasons: reasons.length ? [...new Set(reasons)] : ["CATALOG_EMPTY"] };
   }
 
-  catalogGame(game: CatalogGame): Promise<IntegrationHealthResult> {
-    return this.countRows(
-      `
-        SELECT count(*)::text AS total
+  async catalogGame(game: CatalogGame): Promise<IntegrationHealthResult> {
+    const code = `CATALOG_${game.toUpperCase()}`;
+    try {
+      const result = await this.database.query<{ total: string; available: string; snapshot_age_seconds: number | null }>(`
+        SELECT
+          count(*)::text AS total,
+          count(*) FILTER (WHERE catalog_products.category_id IS NOT NULL
+            AND supplier_listings.active AND supplier_listings.available_quantity > 0
+            AND supplier_listings.price_microusd > 0
+            AND supplier_listings.last_seen_at > clock_timestamp() - interval '15 minutes')::text AS available,
+          (SELECT extract(epoch FROM clock_timestamp() - observed_at)::double precision
+            FROM catalog_sync_runs
+            WHERE source = 'sih' AND game = $1 AND status = 'promoted' AND finished_at IS NOT NULL
+            ORDER BY observed_at DESC, finished_at DESC, id DESC LIMIT 1) AS snapshot_age_seconds
         FROM catalog_products
-        WHERE kind = 'skins'
-          AND lower(coalesce(game, '')) = $1
-          AND public_enabled = true
-      `,
-      [game],
-      `CATALOG_${game.toUpperCase()}_EMPTY`,
-    );
+        LEFT JOIN supplier_listings ON catalog_products.supplier_provider = 'sih'
+          AND supplier_listings.supplier = 'sih' AND supplier_listings.game = lower(catalog_products.game)
+          AND supplier_listings.market_hash_name = catalog_products.supplier_item_id
+        WHERE catalog_products.kind = 'skins' AND lower(catalog_products.game) = $1 AND catalog_products.public_enabled = true
+      `, [game]);
+      const row = result.rows[0];
+      const total = Number(row?.total ?? 0);
+      const available = Number(row?.available ?? 0);
+      const snapshotAgeSeconds = row?.snapshot_age_seconds ?? null;
+      const reasons: string[] = [];
+      if (total <= 0) reasons.push(`${code}_EMPTY`);
+      if (available <= 0) reasons.push(`${code}_UNAVAILABLE`);
+      if (snapshotAgeSeconds === null) reasons.push(`${code}_SYNC_MISSING`);
+      else if (!Number.isFinite(snapshotAgeSeconds) || snapshotAgeSeconds < 0 || snapshotAgeSeconds >= 900) reasons.push(`${code}_STALE`);
+      return { status: reasons.length ? "down" : "ok", total, available, snapshotAgeSeconds, ...(reasons.length ? { reasons } : {}) };
+    } catch { return down(null, `${code}_UNAVAILABLE`); }
+  }
+
+  async pricing(): Promise<IntegrationHealthResult> {
+    try {
+      const result = await this.database.query<{
+        active_count: string; supplier_currency: string; fiat_currency: string;
+        supplier_to_fiat_rate_minor: number; coin_rate_numerator: number; coin_rate_denominator: number;
+        markup_bps: number; min_price_coin_minor: number; round_to_coin_minor: number; valid_from: Date;
+      }>(`SELECT count(*) OVER ()::text AS active_count, supplier_currency, fiat_currency,
+          supplier_to_fiat_rate_minor, coin_rate_numerator, coin_rate_denominator,
+          markup_bps, min_price_coin_minor, round_to_coin_minor, valid_from
+        FROM pricing_settings WHERE scope = 'sih-skins' AND superseded_at IS NULL
+        ORDER BY valid_from DESC, created_at DESC, id DESC LIMIT 1`);
+      const setting = result.rows[0];
+      if (!setting || Number(setting.active_count) !== 1 || setting.supplier_currency !== "USD" || setting.fiat_currency !== "RUB" ||
+        ![setting.supplier_to_fiat_rate_minor, setting.coin_rate_numerator, setting.coin_rate_denominator, setting.round_to_coin_minor].every(value => Number.isSafeInteger(value) && value > 0) ||
+        ![setting.markup_bps, setting.min_price_coin_minor].every(value => Number.isSafeInteger(value) && value >= 0) ||
+        setting.coin_rate_numerator !== 2 * setting.coin_rate_denominator ||
+        !(setting.valid_from instanceof Date) || !Number.isFinite(setting.valid_from.getTime()) || setting.valid_from.getTime() > Date.now()) {
+        return down(null, "CATALOG_PRICING_INVALID");
+      }
+      return { status: "ok" };
+    } catch { return down(null, "CATALOG_PRICING_UNAVAILABLE"); }
   }
 
   private async countRows(
@@ -134,9 +181,9 @@ export class IntegrationHealthService {
   }
 }
 
-function down(error: unknown, fallback: string): IntegrationHealthResult {
+function down(_error: unknown, fallback: string): IntegrationHealthResult {
   return {
     status: "down",
-    reasons: [error instanceof Error ? error.message : fallback],
+    reasons: [fallback],
   };
 }

@@ -26,7 +26,7 @@ const config: AppConfig = {
     steamRefillApiKeyFile: "/run/secrets/sih-steam-refill",
     steamRefillBaseUrl: "https://core.steaminventoryhelper.com",
   },
-  catalog: { publicGames: ["cs2"] },
+  catalog: { publicGames: ["cs2", "rust", "tf2"] },
   notifications: {
     smtpHost: "smtp.purelymail.com",
     smtpPort: 465,
@@ -55,39 +55,21 @@ describe("IntegrationService", () => {
         adminAllowedHosts: ["api.gems.example"],
       },
       commerceEvents: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         delivery: "site_to_vv_admin_webhook",
       },
     });
     expect(manifest).not.toHaveProperty("protocolVersion");
     expect(manifest.healthChecks.map((check) => check.key)).toEqual([
-      "backend_http",
-      "frontend_http",
-      "postgres",
-      "redis",
-      "top_up_payment",
-      "checkout_fulfillment",
-      "quote_storage",
-      "steam_refill",
-      "visible_catalog",
-      "catalog_cs2",
+      "backend_http", "frontend_http", "postgres", "redis", "catalog_cs2", "catalog_rust", "catalog_tf2", "catalog_pricing",
     ]);
+    expect(manifest.healthChecks.every(check => check.intervalSeconds === 300)).toBe(true);
+    expect(manifest.healthChecks.find(check => check.key === "postgres")?.url).toBe("https://api.gems.example/admin/integration/health/postgres");
     expect(manifest).not.toHaveProperty("catalog");
     expect(manifest).not.toHaveProperty("storeOrders");
-    expect(manifest.syntheticScenarios).toEqual([
-      expect.objectContaining({
-        key: "checkout_payment_reached",
-        label: "Проверить выход на оплату",
-        kind: "synthetic_transaction",
-        productionSafe: true,
-        effect: "creates_synthetic_entities",
-        requiresCleanup: true,
-        run: {
-          method: "POST",
-          url: "https://api.gems.example/admin/integration/scenarios/checkout-payment-reached/run",
-        },
-      }),
-    ]);
+    expect(manifest).toHaveProperty("browserScenarios", { enabled: false });
+    expect(manifest.syntheticScenarios).toEqual([]);
+    expect(manifest.actions).toEqual([]);
     expect(JSON.stringify(manifest)).not.toMatch(/secret|token|password/i);
   });
 

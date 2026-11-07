@@ -64,3 +64,24 @@ it.each(['cs2','rust','tf2'])('exposes authenticated catalog health for %s',asyn
  await expect(controller.catalogGameHealth(game,{status:vi.fn()} as never)).resolves.toEqual({status:'ok'});
  expect(health.catalogGame).toHaveBeenCalledWith(game);
 });
+
+ it("returns HTTP 503 for PostgreSQL failure", async () => {
+   const controller = new IntegrationController({} as never, {} as never, {} as never, {
+     postgres: () => Promise.resolve({ status: "down", reasons: ["POSTGRES_UNAVAILABLE"] }),
+   } as never);
+   const response = { status: vi.fn() };
+   expect(await controller.postgresHealth(response as never)).toEqual({ status: "down", reasons: ["POSTGRES_UNAVAILABLE"] });
+   expect(response.status).toHaveBeenCalledWith(503);
+ });
+ it("returns HTTP 503 for invalid pricing", async () => {
+   const controller = new IntegrationController({} as never, {} as never, {} as never, {
+     pricing: () => Promise.resolve({ status: "down", reasons: ["CATALOG_PRICING_INVALID"] }),
+   } as never);
+   const response = { status: vi.fn() };
+   expect(await controller.pricingHealth(response as never)).toEqual({ status: "down", reasons: ["CATALOG_PRICING_INVALID"] });
+   expect(response.status).toHaveBeenCalledWith(503);
+ });
+ it.each(["", "../unsafe", "a".repeat(101), " space "])("rejects invalid scenario runId %s", async runId => {
+   const controller = createController({ scenario: { runCheckoutPaymentReached: vi.fn() }, verifier: { verify: () => true } });
+   await expect(controller.runCheckoutPaymentReached({ runId }, { "x-vv-admin-signature": "signature", "x-vv-admin-timestamp": "timestamp" })).rejects.toBeInstanceOf(BadRequestException);
+ });

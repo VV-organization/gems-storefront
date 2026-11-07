@@ -61,6 +61,16 @@ export class IntegrationController {
   @Get("admin/integration/health/operations")
   operations(){return this.integrationHealth.operations();}
 
+  @Get("admin/integration/health/postgres")
+  async postgresHealth(@Res({ passthrough: true }) response: Response): Promise<IntegrationHealthResult> {
+    return respondHealth(response, await this.integrationHealth.postgres());
+  }
+
+  @Get("admin/integration/health/pricing")
+  async pricingHealth(@Res({ passthrough: true }) response: Response): Promise<IntegrationHealthResult> {
+    return respondHealth(response, await this.integrationHealth.pricing());
+  }
+
   @Get("admin/integration/health/redis")
   async redisHealth(@Res({ passthrough: true }) response: Response): Promise<IntegrationHealthResult> {
     return respondHealth(response, await this.integrationHealth.redis());
@@ -153,13 +163,13 @@ function readScenarioRunBody(body: unknown): { readonly runId: string } {
     throw new BadRequestException("Scenario run body is invalid");
   }
   const runId = (body as { runId?: unknown }).runId;
-  if (typeof runId !== "string" || runId.trim().length === 0) {
+  if (typeof runId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(runId)) {
     throw new BadRequestException("runId is required");
   }
-  return { runId: runId.trim() };
+  return { runId };
 }
 
 function singleHeader(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0];
+  if (Array.isArray(value)) return undefined;
   return value;
 }

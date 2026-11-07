@@ -1,84 +1,43 @@
 import { createHash, createHmac } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-
-import type { AppConfig } from "../../config/app-config";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { loadAppConfig } from "../../config/app-config";
 import { VvAdminScenarioAuthVerifier } from "./vv-admin-scenario-auth";
 
-function createConfig(secretFile?: string): AppConfig {
-  return {
-    nodeEnv: "test",
-    port: 3000,
-    admin: {},
-    steam: {},
-    arcoPay: { paymentOrigin: "https://payment.paidlayer.com", environment: "sandbox", providerMode: "disabled", apiUrl: "https://api.clickit.team/api/v1" },
-    sih: {
-      marketBaseUrl: "https://api.sih.market",
-      maximumBodyBytes: 4096,
-      requestTimeoutMs: 2500,
-      steamRefillBaseUrl: "https://core.steaminventoryhelper.com",
-    },
-    catalog: { publicGames: ["cs2"] },
-    notifications: {
-      smtpHost: "smtp.purelymail.com",
-      smtpPort: 465,
-      smtpSecure: true,
-    },
-    integration: {
-      publicOrigin: "https://gems.example",
-      adminOrigin: "https://gems.example",
-      ...(secretFile ? { protocolAuthSecretFile: secretFile } : {}),
-    },
-    corsOrigins: [],
-  };
+const path = "/admin/integration/scenarios/checkout-payment-reached/run";
+const now = "2026-11-07T12:00:00.000Z";
+const body = JSON.stringify({ runId: "local-test" });
+const secret = "local-only-shared-secret";
+function sign(timestamp: string, publicPath = `/api${path}`, payload = body) {
+  return createHmac("sha256", secret).update(["POST", publicPath, timestamp, createHash("sha256").update(payload).digest("hex")].join("\n")).digest("hex");
 }
-
-function sign(input: {
-  secret: string;
-  timestamp: string;
-  body: string;
-  path: string;
-}) {
-  const bodyHash = createHash("sha256").update(input.body).digest("hex");
-  return createHmac("sha256", input.secret)
-    .update(["POST", input.path, input.timestamp, bodyHash].join("\n"))
-    .digest("hex");
-}
-
-describe("VvAdminScenarioAuthVerifier", () => {
-  it("accepts a valid VV Admin scenario signature", () => {
-    const directory = mkdtempSync(join(tmpdir(), "vv-scenario-auth-"));
-    const secretFile = join(directory, "secret");
-    writeFileSync(secretFile, "shared-secret\n", "utf8");
-    const verifier = new VvAdminScenarioAuthVerifier(createConfig(secretFile));
-    const body = JSON.stringify({ runId: "run-1" });
-    const timestamp = "2026-08-13T12:00:00.000Z";
-
-    expect(
-      verifier.verify({
-        body,
-        path: "/admin/integration/scenarios/checkout-payment-reached/run",
-        signature: sign({
-          secret: "shared-secret",
-          timestamp,
-          body,
-          path: "/admin/integration/scenarios/checkout-payment-reached/run",
-        }),
-        timestamp,
-      }),
-    ).toBe(true);
+describe("scenario authentication", () => {
+  let directory: string;
+  let verifier: VvAdminScenarioAuthVerifier;
+  beforeAll(() => {
+    directory = mkdtempSync(join(tmpdir(), "gems-auth-"));
+    const file = join(directory, "secret"); writeFileSync(file, secret);
+    verifier = new VvAdminScenarioAuthVerifier(loadAppConfig({ NODE_ENV: "test", VV_ADMIN_API_ORIGIN: "https://gems.example/api", VV_ADMIN_PUBLIC_ORIGIN: "https://gems.example", VV_ADMIN_INTEGRATION_SECRET_FILE: file }));
   });
-
-  it("rejects invalid or unconfigured signatures", () => {
-    expect(
-      new VvAdminScenarioAuthVerifier(createConfig()).verify({
-        body: "{}",
-        path: "/admin/integration/scenarios/checkout-payment-reached/run",
-        signature: "bad",
-        timestamp: "2026-08-13T12:00:00.000Z",
-      }),
-    ).toBe(false);
+  afterAll(() => { rmSync(directory, { recursive: true, force: true }); });
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(now)); });
+  afterEach(() => { vi.useRealTimers(); });
+  it("accepts the public API path and the five-minute window boundaries", () => {
+    for (const timestamp of [now, "2026-11-07T11:55:00.000Z", "2026-11-07T12:05:00.000Z"]) {
+      expect(verifier.verify({ body, path, timestamp, signature: sign(timestamp) })).toBe(true);
+    }
+  });
+  it.each(["2026-11-07T11:54:59.999Z", "2026-11-07T12:05:00.001Z", "2026-11-07T12:00:00Z", "invalid"])("rejects stale/future/noncanonical timestamp %s", timestamp => {
+    expect(verifier.verify({ body, path, timestamp, signature: sign(timestamp) })).toBe(false);
+  });
+  it("binds the public prefix, body and endpoint", () => {
+    expect(verifier.verify({ body, path, timestamp: now, signature: sign(now, path) })).toBe(false);
+    expect(verifier.verify({ body: body + " ", path, timestamp: now, signature: sign(now) })).toBe(false);
+    expect(verifier.verify({ body, path: path + "-other", timestamp: now, signature: sign(now) })).toBe(false);
+  });
+  it("rejects an unconfigured secret", () => {
+    expect(new VvAdminScenarioAuthVerifier(loadAppConfig({ NODE_ENV: "test" })).verify({ body, path, timestamp: now, signature: sign(now) })).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import { loadAppConfig } from "../../config/app-config";
 describe("Gems product boundary", () => {
   it("catalog health and admin capabilities do not depend on Apple", async () => {
     const config=loadAppConfig({NODE_ENV:"test"});
-    const query=vi.fn().mockResolvedValueOnce({rows:[{total:"4"}]}).mockResolvedValue({rows:[{total:"0"}]});
+    const query=vi.fn().mockResolvedValue({rows:[{total:"4",available:"4",snapshot_age_seconds:10}]});
     const health=new IntegrationHealthService({query} as never,config);
     await expect(health.visibleCatalog()).resolves.toMatchObject({status:"ok",total:4});
     expect(new IntegrationService(config).manifest()).not.toHaveProperty("storeOrders");

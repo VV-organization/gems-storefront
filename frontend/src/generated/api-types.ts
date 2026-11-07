@@ -750,6 +750,8 @@ get: {"id": string;
 "/.well-known/vv-admin/manifest.json": {get: unknown;};
 "/admin/integration/readiness": {get: unknown;};
 "/admin/integration/health/operations": {get: unknown;};
+"/admin/integration/health/postgres": {get: unknown;};
+"/admin/integration/health/pricing": {get: unknown;};
 "/admin/integration/health/redis": {get: unknown;};
 "/admin/integration/health/top-up": {get: unknown;};
 "/admin/integration/health/checkout": {get: unknown;};
