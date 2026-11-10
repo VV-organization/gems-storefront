@@ -918,7 +918,7 @@ export class PaymentsService {
           JSON.stringify({
             ...(bound?{...bound,quoteId:command.quoteBinding?.quoteId}:{}),
             arcoPayConfigured: true,
-            providerPaymentMethod: "card",
+            providerPaymentMethod: "unknown",
             environment: this.config.arcoPay.environment,
           }),
         ],
@@ -949,7 +949,7 @@ export class PaymentsService {
             coinAmountMinor: command.coinAmountMinor,
             currency: "RUB",
             provider: TOP_UP_PROVIDER,
-            providerPaymentMethod: "sbp",
+            providerPaymentMethod: "unknown",
             rate: {
               fiatMinor: COIN_RATE_FIAT_MINOR,
               coinMinor: COIN_RATE_COIN_MINOR,
@@ -1132,7 +1132,7 @@ export class PaymentsService {
           JSON.stringify({
             ...(bound?{...bound,quoteId:command.quoteBinding?.quoteId}:{}),
             arcoPayConfigured: true,
-            providerPaymentMethod: "card",
+            providerPaymentMethod: "unknown",
             environment: this.config.arcoPay.environment,
             purpose: bound?.purpose ?? "steam_refill_payment",
           }),
@@ -1165,7 +1165,7 @@ export class PaymentsService {
             feeBasisPoints: STEAM_REFILL_FEE_BASIS_POINTS,
             feeRubMinor: paymentTerms.feeRubMinor,
             provider: STEAM_REFILL_PROVIDER,
-            providerPaymentMethod: "sbp",
+            providerPaymentMethod: "unknown",
             purpose: "steam_refill_payment",
             steamAmountRubMinor: paymentTerms.amountRubMinor,
             steamLogin: command.steamLogin,
@@ -1336,7 +1336,7 @@ export class PaymentsService {
       providerEventId: createHash("sha256").update(command.rawBody).digest("hex"),
       eventType: `payment.${payment.status}`, providerPaymentId: payment.id, providerSessionId: payment.id,
       topUpPaymentId: payment.externalId, providerStatus: payment.status, amountMinor: payment.amount, currency: payment.currency,
-      payloadSnapshot: { orderId: payment.id, merchantOrderId: payment.externalId, amount: payment.amount, currency: payment.currency, status: payment.status },
+      payloadSnapshot: { orderId: payment.id, merchantOrderId: payment.externalId, amount: payment.amount, currency: payment.currency, status: payment.status, metadata: payment.metadata },
     });
   }
 
@@ -1493,6 +1493,7 @@ export class PaymentsService {
         providerPaymentId: matched.id,
         providerStatus: matched.status,
         topUpPaymentId: topUpPayment.id,
+        metadata: matched.metadata,
       });
       if (applied === "credited") result.credited += 1;
       if (applied === "failed") result.failed += 1;
@@ -1543,6 +1544,7 @@ export class PaymentsService {
         providerPaymentId: matched.id,
         providerStatus: matched.status,
         steamRefillPaymentId: steamRefillPayment.id,
+        metadata: matched.metadata,
       });
       if (applied === "paid") result.steamRefillsCreated += 1;
       if (applied === "failed") result.failed += 1;
@@ -1567,6 +1569,9 @@ export class PaymentsService {
     if(event.providerPaymentId!==null)await client.query(`UPDATE ${table} SET provider_payment_id=$2 WHERE id=$1 AND provider_payment_id IS NULL`,[id,event.providerPaymentId]);
     else await client.query(`UPDATE ${table} SET provider_session_id=$2 WHERE id=$1 AND provider_session_id IS NULL`,[id,event.providerSessionId]);
     if(this.config.arcoPay.providerMode==='real')await client.query(`UPDATE ${table} SET provider_session_id=$2 WHERE id=$1 AND provider_session_id IS NULL`,[id,event.providerSessionId]);
+    if(this.config.arcoPay.providerMode==='real'&&event.providerStatus==='captured'&&(metadata.providerPaymentMethod==='card'||metadata.providerPaymentMethod==='sbp')) {
+      await client.query(`UPDATE ${table} SET metadata=metadata || $2::jsonb WHERE id=$1`,[id,JSON.stringify({providerPaymentMethod:metadata.providerPaymentMethod})]);
+    }
     return true;
   }
 
@@ -2143,8 +2148,8 @@ export class PaymentsService {
         paymentProvider: "arco_pay",
         providerOrderId: topUp.provider_session_id,
         paymentMethod: {
-          type: topUp.metadata.providerPaymentMethod === "card" ? "card" : "sbp",
-          displayName: topUp.metadata.providerPaymentMethod === "card" ? "Банковская карта" : "СБП",
+          type: topUp.metadata.providerPaymentMethod === "unknown" ? "other" : topUp.metadata.providerPaymentMethod === "card" ? "card" : "sbp",
+          displayName: topUp.metadata.providerPaymentMethod === "unknown" ? "Выбор на платёжной форме" : topUp.metadata.providerPaymentMethod === "card" ? "Банковская карта" : "СБП",
           provider: "ArcoPay",
         },
         paidAmount: (topUp.fiat_amount_minor / 100).toFixed(2),

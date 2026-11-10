@@ -79,7 +79,7 @@ describe.skipIf(!databaseUrl)("ArcoPay CARD hosted checkout and Gems settlement"
       if (endpoint.pathname === "/api/v1/payments/create") {
         creationRequests++;
         if (rejectCreation) return Response.json({ Response: { Success: false, Error: "Fixture rejection" } });
-        expect(payload.PaymentTypes).toEqual(["CARD"]);
+        expect(payload.PaymentTypes).toEqual(["CARD", "IPS"]);
         expect(payload.IsForm).toBe(true);
         expect(payload.Currency).toBe("RUB");
         expect(payload.Type).toBe("PayIn");
@@ -351,24 +351,36 @@ describe.skipIf(!databaseUrl)("ArcoPay CARD hosted checkout and Gems settlement"
     await expectSettledExactlyOnce(kind);
   });
 
-  it.each(kinds)("still settles existing %s IPS orders after switching new checkouts to cards", async kind => {
+  it.each(kinds)("settles new %s IPS orders exactly once", async kind => {
     const { order } = await create(kind);
-    await pool.query(`UPDATE ${tableFor(kind)} SET metadata=metadata - 'providerPaymentMethod' WHERE user_id=$1`, [userId]);
     order.PaymentType = "IPS";
     order.Status = "IPS_ACCEPTED";
     expect((await notify(order)).body).toEqual({ status: "processed" });
     await expectSettledExactlyOnce(kind);
   });
 
-  it("reports the card method in newly created and paid top-up events", async () => {
+  it.each(["callback", "reconciliation"])("reports the confirmed SBP method after %s", async source => {
+    const { session, order } = await create("coins");
+    order.PaymentType = "IPS";
+    order.Status = "IPS_ACCEPTED";
+    if (source === "callback") await notify(order);
+    else await payments.reconcilePendingTopUps({limit:100});
+    const events = await pool.query<{event_type:string;payload:{data:{paymentMethod:{type:string}}}}>(
+      "SELECT event_type,payload FROM vv_admin_integration_outbox WHERE subject_external_id=$1 ORDER BY event_type", [session.id],
+    );
+    expect(Object.fromEntries(events.rows.map(row=>[row.event_type,row.payload.data.paymentMethod.type]))).toEqual({"top_up.created":"other","top_up.completed":"sbp"});
+    await expectSettledExactlyOnce("coins");
+  });
+
+  it("reports the card method only after payment confirmation", async () => {
     const { session, order } = await create("coins");
     order.Status = "CHARGED";
     await notify(order);
-    const events = await pool.query<{ payload: { data: { paymentMethod: { type: string } } } }>(
-      "SELECT payload FROM vv_admin_integration_outbox WHERE subject_external_id=$1 ORDER BY event_type", [session.id],
+    const events = await pool.query<{ event_type:string; payload: { data: { paymentMethod: { type: string } } } }>(
+      "SELECT event_type,payload FROM vv_admin_integration_outbox WHERE subject_external_id=$1 ORDER BY event_type", [session.id],
     );
     expect(events.rows).toHaveLength(2);
-    expect(events.rows.every(row => row.payload.data.paymentMethod.type === "card")).toBe(true);
+    expect(Object.fromEntries(events.rows.map(row=>[row.event_type,row.payload.data.paymentMethod.type]))).toEqual({"top_up.created":"other","top_up.completed":"card"});
   });
 
   it.each(kinds)("rejects invalid signatures and any change to signed raw %s callback bytes", async kind => {

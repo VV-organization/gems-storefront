@@ -48,7 +48,8 @@ export function parseArcoPayPayment(payload: unknown, shopId: string): ArcoPayPa
     throw new Error("ARCO_PAY_ORDER_MISMATCH");
   }
   return { id: order.OrderId, externalId: order.MerchantOrderId, amount: order.Amount, currency: order.Currency,
-    status: order.Status === "IPS_ACCEPTED" || order.Status === "CHARGED" ? "captured" : order.Status.toLowerCase(), metadata: {} };
+    status: order.Status === "IPS_ACCEPTED" || order.Status === "CHARGED" ? "captured" : order.Status.toLowerCase(),
+    metadata: order.Status === "IPS_ACCEPTED" ? {providerPaymentMethod:"sbp"} : order.Status === "CHARGED" ? {providerPaymentMethod:"card"} : {} };
 }
 
 function httpsUrl(value: string): URL {
@@ -77,7 +78,7 @@ export class ArcoPayClient {
     [command.successUrl, command.failUrl, command.cancelUrl, this.options.callbackUrl].forEach(httpsUrl);
     const payment = await this.request("/payments/create", {
       MerchantOrderId: command.externalId, Amount: command.amountMinor, Currency: "RUB", Type: "PayIn",
-      PaymentTypes: ["CARD"], IsForm: true, LifeTime: 900, Description: command.description,
+      PaymentTypes: ["CARD", "IPS"], IsForm: true, LifeTime: 900, Description: command.description,
       CallbackUrl: this.options.callbackUrl,
       RedirectUrl: { SuccessUrl: command.successUrl, FailUrl: command.failUrl },
       ...(command.buyerEmail ? { Buyer: { Email: command.buyerEmail } } : {}),

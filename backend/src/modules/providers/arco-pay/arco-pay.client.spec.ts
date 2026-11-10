@@ -29,7 +29,7 @@ describe("ArcoPayClient", () => {
     expect(calls).toBe(0);
   });
 
-  it("creates only a CARD hosted payment and returns a Paidlayer form URL", async () => {
+  it("permits CARD and IPS so the hosted form can request an SBP QR code", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const client = new ArcoPayClient({ ...options, fetch: (url, init) => { requests.push({ url, ...(init ? { init } : {}) }); return response(payload()); } });
     await expect(client.createHostedCheckout(command)).resolves.toEqual({ providerSessionId: id, checkoutUrl: `https://payment.paidlayer.com/${id}` });
@@ -37,7 +37,7 @@ describe("ArcoPayClient", () => {
     expect(requests[0]?.url).toBe("https://api.clickit.team/api/v1/payments/create");
     expect(requests[0]?.init).toMatchObject({ method: "POST", redirect: "error", headers: { authorization: "Bearer fixture-bearer-token", "x-api-key": "fixture-api-key", "x-req-id": id } });
     expect(requests[0]?.init?.signal).toBeInstanceOf(AbortSignal);
-    expect(JSON.parse(requests[0]?.init?.body as string)).toEqual({ MerchantOrderId: "topup-1", Amount: 10000, Currency: "RUB", Type: "PayIn", PaymentTypes: ["CARD"], IsForm: true, LifeTime: 900, Description: "Пополнение", CallbackUrl: options.callbackUrl, RedirectUrl: { SuccessUrl: command.successUrl, FailUrl: command.failUrl }, Buyer: { Email: "buyer@example.test" } });
+    expect(JSON.parse(requests[0]?.init?.body as string)).toEqual({ MerchantOrderId: "topup-1", Amount: 10000, Currency: "RUB", Type: "PayIn", PaymentTypes: ["CARD", "IPS"], IsForm: true, LifeTime: 900, Description: "Пополнение", CallbackUrl: options.callbackUrl, RedirectUrl: { SuccessUrl: command.successUrl, FailUrl: command.failUrl }, Buyer: { Email: "buyer@example.test" } });
   });
 
   it.each([{ Amount: 9999 }, { MerchantOrderId: "other" }, { Currency: "USD" }, { ShopId: 9999 }])("rejects a mismatched create response %j", async patch => {
@@ -48,7 +48,7 @@ describe("ArcoPayClient", () => {
   it("fetches authoritative status by exact provider order id", async () => {
     let request: RequestInit | undefined;
     const client = new ArcoPayClient({ ...options, fetch: (url, init) => { expect(url).toBe("https://api.clickit.team/api/v1/payments/status"); request = init; return response(payload({ Status: "IPS_ACCEPTED", PaymentType: "IPS" })); } });
-    await expect(client.getPayment(id)).resolves.toEqual({ id, externalId: "topup-1", amount: 10000, currency: "RUB", status: "captured", metadata: {} });
+    await expect(client.getPayment(id)).resolves.toEqual({ id, externalId: "topup-1", amount: 10000, currency: "RUB", status: "captured", metadata: {providerPaymentMethod:"sbp"} });
     expect(JSON.parse(request?.body as string)).toEqual({ OrderId: id });
     expect(new Headers(request?.headers).get("x-req-id")).toMatch(/^[a-f0-9-]{36}$/);
   });
