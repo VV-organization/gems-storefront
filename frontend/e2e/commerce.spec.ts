@@ -108,15 +108,15 @@ for(const width of [1440,768,390,320])test(`Gems exact/short/surplus wallet at $
  await page.setViewportSize({width,height:1000});const state=await fixture(page);
  for(const available of [0,10000,25001,30000]){state.available=available;await page.goto('/cart');if(available>=25001)await expect(page.getByRole('button',{name:'Оплатить Gems',exact:true})).toBeEnabled();else await expect(page.getByRole('button',{name:/Не хватает .* Gems/})).toBeDisabled();await expect(page.locator('.cart-page')).not.toContainText('СБП');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);}
 });
-for(const entry of ['create','resume'])test(`Arco hosted ${entry} posts return URLs to Paidlayer`,async({page})=>{
+for(const entry of ['create','resume','legacy-resume'])test(`Arco hosted ${entry} posts return URLs to Clickit`,async({page})=>{
  await fixture(page);
- const checkoutUrl='https://payment.paidlayer.com/provider-order';
+ const checkoutUrl=entry==='legacy-resume'?'https://payment.paidlayer.com/provider-order':'https://payment.clickit.team/provider-order';
  await page.route('**/api/payments/top-up/sessions',route=>route.fulfill({json:{id:sessionId,checkoutUrl}}));
  await page.route(`**/api/payments/sessions/${sessionId}`,route=>route.fulfill({json:{id:sessionId,purpose:'wallet_topup',paymentStatus:'checkout_pending',fulfillmentStatus:null,fiatAmountMinor:10000,checkoutUrl,refundStatus:null}}));
  let checked=false;
  await page.route(`**/api/payments/sessions/${sessionId}/check`,route=>{checked=true;expect(route.request().method()).toBe('POST');return route.fulfill({json:{id:sessionId,purpose:'wallet_topup',paymentStatus:'checkout_pending',fulfillmentStatus:'not_applicable',fiatAmountMinor:10000,checkoutUrl,canPay:true,expiresAt:new Date(Date.now()+60000).toISOString(),failureReason:null,refundStatus:null}});});
- await page.route('https://payment.paidlayer.com/**',async route=>{
-  if(entry==='resume')expect(checked).toBe(true);
+ await page.route('https://payment.clickit.team/**',async route=>{
+  if(entry!=='create')expect(checked).toBe(true);
   expect(route.request().method()).toBe('POST');
   const fields=new URLSearchParams(route.request().postData()??'');
   for(const key of ['successUrl','failUrl']){
@@ -127,7 +127,7 @@ for(const entry of ['create','resume'])test(`Arco hosted ${entry} posts return U
   }
   await route.fulfill({contentType:'text/html',body:'<h1>Payment provider fixture</h1>'});
  });
- if(entry==='resume'){
+ if(entry!=='create'){
   await page.goto(`/payments/return?session=${sessionId}`);
   await page.getByRole('button',{name:'Оплатить',exact:true}).click();
  }else{
@@ -158,7 +158,7 @@ for(const outcome of ['expired','paid','error'])test(`history payment checks ${o
   checks++;checked=true;
   return r.fulfill(outcome==='error'?{status:503,json:{message:'Status unavailable'}}:{json:{id:sessionId,purpose:'wallet_topup',paymentStatus:outcome==='expired'?'failed':'paid',fulfillmentStatus:'not_applicable',fiatAmountMinor:10000,checkoutUrl:null,canPay:false,failureReason:outcome==='expired'?'expired':null,expiresAt:payment.expiresAt,refundStatus:null}});
  });
- await page.route('https://payment.paidlayer.com/**',r=>{providerPosts++;return r.abort();});
+ await page.route('https://payment.clickit.team/**',r=>{providerPosts++;return r.abort();});
  await page.goto('/account?tab=transactions');await expect(page.getByRole('button',{name:'Оплатить',exact:true})).toBeVisible();
  mkdirSync('../.local/gems-acceptance/payment-lifecycle',{recursive:true});
  await page.locator('.account-tab-transactions').screenshot({path:`../.local/gems-acceptance/payment-lifecycle/history-unpaid-${width}.png`});
@@ -174,7 +174,7 @@ test('guest continuation after reload uses existing guest CSRF and never creates
  await page.route('**/api/session/me',r=>r.fulfill({status:401,json:{}}));
  await page.route('**/api/session/csrf',r=>r.fulfill({status:401,json:{}}));
  await page.route(`**/api/payments/sessions/${sessionId}`,r=>r.fulfill({status:401,json:{}}));
- const session={id:sessionId,purpose:'steam_refill',paymentStatus:'checkout_pending',fulfillmentStatus:'not_started',fiatAmountMinor:52500,checkoutUrl:'https://payment.paidlayer.com/guest-order',canPay:true,failureReason:null,expiresAt:new Date(Date.now()+60000).toISOString(),refundStatus:null};
+ const session={id:sessionId,purpose:'steam_refill',paymentStatus:'checkout_pending',fulfillmentStatus:'not_started',fiatAmountMinor:52500,checkoutUrl:'https://payment.clickit.team/guest-order',canPay:true,failureReason:null,expiresAt:new Date(Date.now()+60000).toISOString(),refundStatus:null};
  const expired={...session,paymentStatus:'failed',failureReason:'expired',canPay:false,checkoutUrl:null};
  await page.route(`**/api/payments/guest/steam-refill/sessions/${sessionId}`,r=>r.fulfill({json:checks?expired:session}));
  await page.route('**/api/payments/guest/context',r=>{if(r.request().method()==='POST')contextCreates++;return r.fulfill({json:{id:'returning-guest',csrfToken:'restored-guest-csrf'}});});
@@ -197,7 +197,7 @@ test('a retained top-up form replaces its consumed quote before another payment'
   attempts++;const {quoteId}=r.request().postDataJSON();
   if(usedQuotes.has(quoteId))return r.fulfill({status:409,json:{message:'QUOTE_ALREADY_CONSUMED'}});
   usedQuotes.add(quoteId);keys.push(r.request().headers()['idempotency-key']);
-  return r.fulfill({json:{id:sessionId,checkoutUrl:'https://payment.paidlayer.com/retained-form'}});
+  return r.fulfill({json:{id:sessionId,checkoutUrl:'https://payment.clickit.team/retained-form'}});
  });
  await page.goto('/account?tab=balance');const button=page.locator('form').getByRole('button',{name:'Пополнить баланс',exact:true});
  await settled(button);await expect.poll(()=>attempts).toBe(1);await expect(button).toBeEnabled();
@@ -207,13 +207,13 @@ test('a retained top-up form replaces its consumed quote before another payment'
 
 for(const surface of ['status','history'])test(`${surface} polling does not cancel a slow verification before checkout`,async({page})=>{
  await fixture(page);await page.emulateMedia({reducedMotion:'reduce'});await page.clock.install();
- const session={id:sessionId,purpose:'wallet_topup',paymentStatus:'checkout_pending',fulfillmentStatus:'not_applicable',fiatAmountMinor:10000,checkoutUrl:'https://payment.paidlayer.com/slow-check',canPay:true,failureReason:null,expiresAt:new Date(Date.now()+60000).toISOString(),refundStatus:null};
+ const session={id:sessionId,purpose:'wallet_topup',paymentStatus:'checkout_pending',fulfillmentStatus:'not_applicable',fiatAmountMinor:10000,checkoutUrl:'https://payment.clickit.team/slow-check',canPay:true,failureReason:null,expiresAt:new Date(Date.now()+60000).toISOString(),refundStatus:null};
  let reads=0;
  await page.route(`**/api/payments/sessions/${sessionId}`,r=>{reads++;return r.fulfill({json:session});});
  await page.route('**/api/payments/me/history',r=>{reads++;return r.fulfill({json:{payments:[{id:sessionId,kind:'coins_top_up',status:'checkout_pending',amountMinor:10000,currency:'RUB',createdAt:new Date().toISOString(),expiresAt:session.expiresAt,canPay:true}]}});});
  let started=false;let finish!:()=>void;const pending=new Promise<void>(resolve=>{finish=resolve;});
  await page.route(`**/api/payments/sessions/${sessionId}/check`,async r=>{started=true;await pending;await r.fulfill({json:session}).catch(()=>undefined);});
- await page.route('https://payment.paidlayer.com/**',r=>r.fulfill({contentType:'text/html',body:'<h1>Verified checkout</h1>'}));
+ await page.route('https://payment.clickit.team/**',r=>r.fulfill({contentType:'text/html',body:'<h1>Verified checkout</h1>'}));
  await page.goto(surface==='status'?`/payments/return?session=${sessionId}`:'/account?tab=transactions');await page.getByRole('button',{name:'Оплатить',exact:true}).click();
  await expect.poll(()=>started).toBe(true);const initialReads=reads;
  await page.clock.fastForward(surface==='status'?2500:30500);await expect.poll(()=>reads).toBeGreaterThan(initialReads);finish();
@@ -236,9 +236,9 @@ test('changing the session resets an aborted status action',async({page})=>{
 test('replayed unknown payment opens current status rather than an expired hosted URL',async({page})=>{
  const state=await fixture(page);state.failSession=true;
  await page.goto('/account?tab=balance');await page.locator('form').getByRole('button',{name:'Пополнить баланс',exact:true}).click();await expect(page.getByText(/Результат запроса пока неизвестен/)).toBeVisible();
- await page.route('**/api/payments/top-up/sessions',r=>r.fulfill({json:{id:sessionId,checkoutUrl:'https://payment.paidlayer.com/expired-session'}}));
+ await page.route('**/api/payments/top-up/sessions',r=>r.fulfill({json:{id:sessionId,checkoutUrl:'https://payment.clickit.team/expired-session'}}));
  await page.route(`**/api/payments/sessions/${sessionId}`,r=>r.fulfill({json:{id:sessionId,purpose:'wallet_topup',paymentStatus:'failed',failureReason:'expired',fulfillmentStatus:'not_applicable',fiatAmountMinor:50000,checkoutUrl:null,canPay:false}}));
- let hosted=0;await page.route('https://payment.paidlayer.com/**',r=>{hosted++;return r.fulfill({contentType:'text/html',body:'<h1>Expired hosted checkout</h1>'});});
+ let hosted=0;await page.route('https://payment.clickit.team/**',r=>{hosted++;return r.fulfill({contentType:'text/html',body:'<h1>Expired hosted checkout</h1>'});});
  await page.getByRole('button',{name:'Проверить результат запроса',exact:true}).click();await expect(page.getByRole('heading',{name:'Срок оплаты истёк',exact:true})).toBeVisible();expect(hosted).toBe(0);expect(state.keys).toHaveLength(1);
 });
 

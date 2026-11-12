@@ -90,3 +90,12 @@ docker compose config --quiet
 `catalog` обновляет supplier каждые 5 минут; `catalog-metadata` отдельно обновляет metadata раз в сутки. Проверять свежесть каждого game и длительность цикла. Financial acceptance: [инструкция](provider-acceptance.md). Восстановление: [recovery](recovery.md). Юридические реквизиты Gems должны быть предоставлены перед публичным запуском.
 
 `reconciliation` — отдельный Node worker: wallet проверяется всегда, provider reconciliation выполняется только при `ARCO_PAY_PROVIDER_MODE=real`. Ошибка одного направления не пропускает другое. SIGTERM завершает текущий цикл и прерывает ожидание следующего; Compose даёт 120 секунд для завершения. Это проверка/сверка, не автоматическое исправление расхождений кошелька.
+
+### Платёжная форма Clickit
+
+API создания платежа: `https://api.clickit.team/api/v1/payments/create`.
+`ARCO_PAY_PAYMENT_ORIGIN=https://payment.clickit.team` задаёт отдельный адрес формы.
+Историческое значение `https://payment.paidlayer.com` в серверном env при загрузке
+конфигурации переводится на Clickit. Сохранённые ссылки старых сессий также открываются
+на Clickit с тем же OrderId через POST с `successUrl` и `failUrl`; новый платёж не создаётся.
+Ключи, shop, проверка webhook и правила зачисления при этой замене не меняются.

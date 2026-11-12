@@ -1,8 +1,10 @@
 export function hostedCheckoutTarget(checkoutUrl: string, session: string, origin: string) {
  const action = new URL(checkoutUrl);
  const site = new URL(origin);
- if(action.origin !== 'https://payment.paidlayer.com' || action.username || action.password || action.search || action.hash || !/^\/[a-zA-Z0-9_-]{1,128}$/.test(action.pathname)) throw new Error('Invalid checkout URL');
+ if(!['https://payment.clickit.team','https://payment.paidlayer.com'].includes(action.origin) || action.username || action.password || action.search || action.hash || !/^\/[a-zA-Z0-9_-]{1,128}$/.test(action.pathname)) throw new Error('Invalid checkout URL');
  if(!session || site.username || site.password || (site.protocol !== 'https:' && !(site.protocol === 'http:' && ['localhost','127.0.0.1','[::1]'].includes(site.hostname)))) throw new Error('Invalid payment return');
+ // Resume previously stored sessions on Clickit without creating another order.
+ action.hostname = 'payment.clickit.team';
  const success = new URL('/payments/return', site.origin);
  success.searchParams.set('session', session);
  const fail = new URL(success);

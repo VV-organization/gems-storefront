@@ -32,7 +32,7 @@ describe("ArcoPayClient", () => {
   it("permits CARD and IPS so the hosted form can request an SBP QR code", async () => {
     const requests: Array<{ url: string; init?: RequestInit }> = [];
     const client = new ArcoPayClient({ ...options, fetch: (url, init) => { requests.push({ url, ...(init ? { init } : {}) }); return response(payload()); } });
-    await expect(client.createHostedCheckout(command)).resolves.toEqual({ providerSessionId: id, checkoutUrl: `https://payment.paidlayer.com/${id}` });
+    await expect(client.createHostedCheckout(command)).resolves.toEqual({ providerSessionId: id, checkoutUrl: `https://payment.clickit.team/${id}` });
     expect(requests).toHaveLength(1);
     expect(requests[0]?.url).toBe("https://api.clickit.team/api/v1/payments/create");
     expect(requests[0]?.init).toMatchObject({ method: "POST", redirect: "error", headers: { authorization: "Bearer fixture-bearer-token", "x-api-key": "fixture-api-key", "x-req-id": id } });

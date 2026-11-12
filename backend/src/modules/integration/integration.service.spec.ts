@@ -10,7 +10,7 @@ const config: AppConfig = {
   redisUrl: "redis://localhost:6379/0",
   admin: { apiTokenFile: "/run/secrets/admin-token" },
   steam: {},
-  arcoPay: { bearerTokenFile: "/run/secrets/token", shopId:"1581", callbackUrl:"https://gems.example/payments/webhooks/arco-pay", paymentOrigin: "https://payment.paidlayer.com",
+  arcoPay: { bearerTokenFile: "/run/secrets/token", shopId:"1581", callbackUrl:"https://gems.example/payments/webhooks/arco-pay", paymentOrigin: "https://payment.clickit.team",
     apiUrl: "https://api.clickit.team/api/v1",
     environment: "sandbox",
     providerMode: "real",

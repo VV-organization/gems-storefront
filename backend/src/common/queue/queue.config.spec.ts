@@ -8,7 +8,7 @@ const baseConfig: AppConfig = {
   port: 3000,
   admin: {},
   steam: {},
-  arcoPay: { paymentOrigin: "https://payment.paidlayer.com", environment: "sandbox", providerMode: "disabled", apiUrl: "https://api.clickit.team/api/v1" },
+  arcoPay: { paymentOrigin: "https://payment.clickit.team", environment: "sandbox", providerMode: "disabled", apiUrl: "https://api.clickit.team/api/v1" },
   sih: {
     marketBaseUrl: "https://api.sih.market",
     maximumBodyBytes: 16_777_216,

@@ -6,6 +6,11 @@ import { describe, expect, it } from "vitest";
 import { isArcoPayConfigured, loadAppConfig } from "./app-config";
 
 describe("loadAppConfig", () => {
+  it("migrates the deployed Paidlayer origin to Clickit", () => {
+    for (const origin of [undefined, "https://payment.paidlayer.com", "https://payment.paidlayer.com/", "https://payment.clickit.team"]) {
+      expect(loadAppConfig({NODE_ENV: "test", ARCO_PAY_PAYMENT_ORIGIN: origin}).arcoPay.paymentOrigin).toBe("https://payment.clickit.team");
+    }
+  });
   it("parses runtime urls, secret-file paths, and CORS origins without exposing secret values", () => {
     expect(loadAppConfig({
       NODE_ENV: "test",
@@ -50,7 +55,7 @@ describe("loadAppConfig", () => {
       steam: {
         webApiKeyFile: "/run/secrets/steam-web-api-key",
       },
-      arcoPay: { paymentOrigin: "https://payment.paidlayer.com",
+      arcoPay: { paymentOrigin: "https://payment.clickit.team",
         apiUrl: "https://api.clickit.team/api/v1",
         environment: "sandbox",
         providerMode: "fake",

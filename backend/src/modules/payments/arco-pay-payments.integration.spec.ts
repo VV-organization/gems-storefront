@@ -154,7 +154,7 @@ describe.skipIf(!databaseUrl)("ArcoPay CARD hosted checkout and Gems settlement"
       fiatAmountMinor: kind === "coins" ? 100000 : 52500,
     });
     expect(order.Amount).toBe(kind === "coins" ? 100000 : 52500);
-    expect(session.checkoutUrl).toBe(`https://payment.paidlayer.com/${order.OrderId}`);
+    expect(session.checkoutUrl).toBe(`https://payment.clickit.team/${order.OrderId}`);
     return { session, order };
   }
 

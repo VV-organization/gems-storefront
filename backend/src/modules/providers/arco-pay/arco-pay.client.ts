@@ -66,7 +66,7 @@ export class ArcoPayClient {
   constructor(private readonly options: ArcoPayClientOptions) {
     this.baseUrl = (options.baseUrl ?? "https://api.clickit.team/api/v1").replace(/\/$/, "");
     if (httpsUrl(this.baseUrl).search) throw new Error("ARCO_PAY_URL_INVALID");
-    this.paymentOrigin = httpsUrl(options.paymentOrigin ?? "https://payment.paidlayer.com");
+    this.paymentOrigin = httpsUrl(options.paymentOrigin ?? "https://payment.clickit.team");
     if (this.paymentOrigin.pathname !== "/" || this.paymentOrigin.search) throw new Error("ARCO_PAY_URL_INVALID");
   }
 

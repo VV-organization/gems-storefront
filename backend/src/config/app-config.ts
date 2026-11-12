@@ -181,6 +181,10 @@ export function loadAppConfig(env: NodeJS.ProcessEnv): AppConfig {
   const nodeEnv = parseNodeEnv(env.NODE_ENV);
   const databaseUrl = optionalString(env.DATABASE_URL) ?? optionalStringFromFile(env.DATABASE_URL_FILE);
   const redisUrl = optionalString(env.REDIS_URL);
+  const configuredPaymentOrigin = parseHttpsPublicBaseUrl("ARCO_PAY_PAYMENT_ORIGIN", env.ARCO_PAY_PAYMENT_ORIGIN);
+  // Existing deployments still carry the retired hosted-form origin in their secret env.
+  const paymentOrigin = !configuredPaymentOrigin || configuredPaymentOrigin === "https://payment.paidlayer.com"
+    ? "https://payment.clickit.team" : configuredPaymentOrigin;
   const arcoPayApiKeyFile = optionalString(env.ARCO_PAY_API_KEY_FILE);
   const bearerTokenFile = optionalString(env.ARCO_PAY_BEARER_TOKEN_FILE);
   const shopId = optionalString(env.ARCO_PAY_SHOP_ID);
@@ -252,7 +256,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv): AppConfig {
     },
     arcoPay: {
       apiUrl: parseHttpsUrl("ARCO_PAY_API_URL", env.ARCO_PAY_API_URL, "https://api.clickit.team/api/v1"),
-      paymentOrigin: parseHttpsPublicBaseUrl("ARCO_PAY_PAYMENT_ORIGIN", env.ARCO_PAY_PAYMENT_ORIGIN) ?? "https://payment.paidlayer.com",
+      paymentOrigin,
       ...(bearerTokenFile ? { bearerTokenFile } : {}),
       ...(shopId ? { shopId } : {}),
       ...(callbackUrl ? { callbackUrl } : {}),
