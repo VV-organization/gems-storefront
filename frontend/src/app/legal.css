@@ -3,6 +3,9 @@
  padding:24px var(--pad);border-top:1px solid var(--line);
  font-size:13px;color:var(--muted);
 }
+.footer-company {flex-basis:100%;display:grid;gap:5px;line-height:1.8;}
+.footer-company strong {font-size:14px;color:var(--paper);}
+.footer-company address {max-width:620px;font-style:normal;overflow-wrap:anywhere;}
 .footer-legal a {padding-block:6px;overflow-wrap:anywhere;}
 .footer-legal a:hover {color:var(--amber);}
 .footer-legal > a {margin-left:auto;}
