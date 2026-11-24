@@ -73,6 +73,15 @@ describe("IntegrationService", () => {
     expect(JSON.stringify(manifest)).not.toMatch(/secret|token|password/i);
   });
 
+  it("advertises the worker scenario with payments and dedicated signing enabled", () => {
+    const manifest = new IntegrationService({...config,
+      commerce: {paymentsEnabled: true, checkoutEnabled: true, fulfillmentEnabled: true},
+      integration: {...config.integration, protocolAuthSecretFile: "/test/scenario"},
+    }).manifest();
+    expect(manifest.syntheticScenarios).toMatchObject([{key: "checkout_payment_reached", execution: "worker",
+      run: {method: "POST", url: "https://api.gems.example/admin/integration/scenarios/checkout-payment-reached/run"}}]);
+  });
+
   it("reports readiness from configured dependencies", () => {
     expect(new IntegrationService(config).readiness()).toEqual({
       status: "ok",

@@ -1,3 +1,4 @@
+import { PaymentsModule } from "../payments/payments.module";
 import { Module } from "@nestjs/common";
 
 import { AppConfigModule } from "../../config/app-config.module";
@@ -12,7 +13,7 @@ import { VvAdminOutboxService } from "./vv-admin-outbox.service";
 import { VvAdminScenarioAuthVerifier } from "./vv-admin-scenario-auth";
 
 @Module({
-  imports: [AppConfigModule, AdminModule, DatabaseModule],
+  imports: [AppConfigModule, AdminModule, DatabaseModule, PaymentsModule],
   controllers: [IntegrationController],
   providers: [
     IntegrationHealthService,

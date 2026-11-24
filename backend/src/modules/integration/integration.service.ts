@@ -4,6 +4,19 @@ import type { AppConfig } from "../../config/app-config";
 import { isArcoPayConfigured } from "../../config/app-config";
 import { APP_CONFIG } from "../../config/app-config.module";
 
+export function scenarioAvailable(config: AppConfig): boolean {
+  return Boolean(config.integration.protocolAuthSecretFile && config.commerce?.paymentsEnabled && isArcoPayConfigured(config.arcoPay));
+}
+
+function scenarioDescriptor(adminOrigin: string) {
+  return {
+    key: "checkout_payment_reached", label: "Проверить выход на оплату", execution: "worker",
+    kind: "synthetic_transaction", effect: "creates_synthetic_entities", productionSafe: true, requiresCleanup: false,
+    intervalSeconds: 21_600, timeoutMs: 60_000,
+    run: { method: "POST", url: `${adminOrigin}/admin/integration/scenarios/checkout-payment-reached/run` },
+  } as const;
+}
+
 type IntegrationManifest = {
   readonly site: { readonly key: string; readonly displayName: "Gems"; readonly publicOrigin: string; readonly adminOrigin: string; readonly adminAllowedHosts: readonly string[] };
   readonly commerceEvents: { readonly schemaVersion: 2; readonly delivery: "site_to_vv_admin_webhook" };
@@ -12,7 +25,7 @@ type IntegrationManifest = {
     readonly key: string; readonly label: string; readonly kind: "http_status";
     readonly method: "GET"; readonly url: string; readonly timeoutMs: number; readonly intervalSeconds: number;
   }[];
-  readonly syntheticScenarios: readonly never[];
+  readonly syntheticScenarios: readonly ReturnType<typeof scenarioDescriptor>[];
   readonly actions: readonly never[];
 };
 
@@ -48,7 +61,7 @@ export class IntegrationService {
         ...this.config.catalog.publicGames.map(game => check(`catalog_${game}`, `Каталог ${game.toUpperCase()}`, `${adminOrigin}/admin/integration/health/catalog/${game}`, 10000)),
         check("catalog_pricing", "Настройки цены Gems", `${adminOrigin}/admin/integration/health/pricing`),
       ],
-      syntheticScenarios: [],
+      syntheticScenarios: scenarioAvailable(this.config) ? [scenarioDescriptor(adminOrigin)] : [],
       actions: [],
     };
   }

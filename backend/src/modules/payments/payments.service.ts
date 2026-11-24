@@ -1,3 +1,4 @@
+import { SCENARIO_USER_ID, checkScenarioAdmission, ScenarioPaymentBlocked } from "./synthetic-top-up";
 import {QuotesService} from "../quotes/quotes.service";
 import {WALLET_TERMS_VERSION,STEAM_TERMS_VERSION,type PaymentTerms,type PaymentPurpose,type PaymentQuoteBinding} from "./payment-quote.types";
 import { topUpFiatMinor } from "../../common/money/gems";
@@ -886,9 +887,11 @@ export class PaymentsService {
       const existing = await this.findTopUpPayment(client, command.userId, command.idempotencyKey);
       if (existing !== null) {
         if (existing.request_hash !== hash) throw new ConflictException("Idempotency key is already used for different top-up terms");
+        if (existing.status === "manual_review") await checkScenarioAdmission(client, command.userId, existing.id);
         return {session:toDto(existing),ownsCreation:false};
       }
 
+      await checkScenarioAdmission(client, command.userId);
       const bound = await this.requirePaymentQuote(client, command, "wallet_topup");
       const fiatAmountMinor = fiatMinorForCoinMinor(command.coinAmountMinor);
       const inserted = await client.query<{ id: string }>(
@@ -989,7 +992,7 @@ export class PaymentsService {
     } catch (error) {
       const errorCode = providerErrorCode(error);
       const ambiguous = ambiguousCheckoutCreation(errorCode);
-      await this.database.transaction(async (client) => {
+      const terminalSession = await this.database.transaction(async (client) => {
         const failed = await client.query(
           `
             UPDATE top_up_payments
@@ -1034,7 +1037,14 @@ export class PaymentsService {
             errorCode,
           ],
         );
+        if (!failed.rowCount && command.userId === SCENARIO_USER_ID) {
+          const current = await this.findTopUpPayment(client, command.userId, command.idempotencyKey);
+          if (current?.status === "paid" || current?.status === "failed") return toDto(current);
+        }
+        return null;
       });
+      if (terminalSession) return terminalSession;
+      if (ambiguous && command.userId === SCENARIO_USER_ID) throw new ScenarioPaymentBlocked(initial.id, errorCode);
       throw new ServiceUnavailableException("payment provider checkout creation failed");
     }
 
@@ -2150,7 +2160,7 @@ export class PaymentsService {
       schemaVersion: 2,
       eventId,
       eventType: input.eventType,
-      source: "customer",
+      source: topUp.user_id === SCENARIO_USER_ID ? "scenario" : "customer",
       occurredAt: topUp.updated_at.toISOString(),
       site: { domain: new URL(this.config.integration.publicOrigin).hostname },
       subject: { type: "top_up", externalId: topUp.id },

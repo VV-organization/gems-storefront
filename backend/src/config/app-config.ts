@@ -233,7 +233,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv): AppConfig {
   );
   const protocolAuthSecretFile = optionalString(
     env.VV_ADMIN_INTEGRATION_SECRET_FILE,
-  ) ?? vvAdminWebhookSecretFile;
+  );
 
   if (nodeEnv === "production" && smtpUsername !== undefined && smtpPasswordFile === undefined) {
     throw new Error("PURELYMAIL_SMTP_PASSWORD_FILE is required when PURELYMAIL_SMTP_USERNAME is configured in production.");

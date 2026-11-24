@@ -91,7 +91,6 @@ describe("loadAppConfig", () => {
         vvAdminSiteKey: "gems",
         vvAdminWebhookSiteKey: "gems-webhook-site-key",
         vvAdminWebhookSecretFile: "/run/secrets/vv-admin-webhook-secret",
-        protocolAuthSecretFile: "/run/secrets/vv-admin-webhook-secret",
       },
       corsOrigins: ["https://gems.example", "https://admin.gems.example"],
     });

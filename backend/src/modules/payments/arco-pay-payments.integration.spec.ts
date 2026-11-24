@@ -42,6 +42,7 @@ describe.skipIf(!databaseUrl)("ArcoPay SBP hosted checkout and Gems settlement",
   const originalFetch = globalThis.fetch;
   const orders = new Map<string, ProviderOrder>();
   let rejectCreation = false;
+  let unavailable = false;
   let creationRequests = 0;
   const statusRequests: string[] = [];
   const statusFailures = new Set<string>();
@@ -84,6 +85,7 @@ describe.skipIf(!databaseUrl)("ArcoPay SBP hosted checkout and Gems settlement",
       expect(new Headers(init?.headers).get("authorization")).toBe(isPrevious ? "Bearer previous-token" : "Bearer fixture-bearer-token");
       if (endpoint.pathname === "/api/v1/payments/create") {
         creationRequests++;
+        if (unavailable) return new Response(null, {status: 503});
         if (rejectCreation) return Response.json({ Response: { Success: false, Error: "Fixture rejection" } });
         expect(payload.PaymentTypes).toEqual(["IPS"]);
         expect(payload.IsForm).toBe(true);
@@ -126,6 +128,7 @@ describe.skipIf(!databaseUrl)("ArcoPay SBP hosted checkout and Gems settlement",
   beforeEach(async () => {
     orders.clear();
     rejectCreation = false;
+    unavailable = false;
     creationRequests = 0;
     statusRequests.length = 0;
     statusFailures.clear();
@@ -143,6 +146,55 @@ describe.skipIf(!databaseUrl)("ArcoPay SBP hosted checkout and Gems settlement",
       if (savedEnv[name] === undefined) Reflect.deleteProperty(process.env, name);
       else process.env[name] = savedEnv[name];
     }
+  });
+
+  const scenarioCommand = (run: string) => ({
+    userId: "synthetic:vv-admin", coinAmountMinor: 10_000, idempotencyKey: `vv-admin-synthetic-${run}`,
+  });
+
+  it("serializes scenario admission, replays the run and isolates its commerce event", async () => {
+    const command = scenarioCommand(randomUUID());
+    const contenders = await Promise.allSettled([
+      payments.createTopUpSession(command), payments.createTopUpSession(scenarioCommand(randomUUID())),
+    ]);
+    expect(contenders.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    const [order] = orders.values();
+    if (!order) throw new Error("Expected one hosted order");
+    expect(order.Amount).toBe(5000);
+    const {rows: [payment]} = await pool.query<{idempotency_key: string}>("SELECT idempotency_key FROM top_up_payments WHERE id=$1", [order.MerchantOrderId]);
+    if (!payment) throw new Error("Missing synthetic payment");
+    expect((await payments.createTopUpSession({...command, idempotencyKey: payment.idempotency_key})).id).toBe(order.MerchantOrderId);
+    expect(creationRequests).toBe(1);
+    const events = await pool.query("SELECT payload->>'source' AS source FROM vv_admin_integration_outbox WHERE subject_external_id=$1", [order.MerchantOrderId]);
+    expect(events.rows).toEqual([{source: "scenario"}]);
+  });
+
+  it("reports the merchant order and 503 across retries without creating another invoice", async () => {
+    const command = scenarioCommand(randomUUID());
+    unavailable = true;
+    await expect(payments.createTopUpSession(command)).rejects.toMatchObject({providerCode: "ARCO_PAY_HTTP_503"});
+    const {rows: [record]} = await pool.query<{id: string; status: string}>("SELECT id,status FROM top_up_payments WHERE idempotency_key=$1", [command.idempotencyKey]);
+    if (!record) throw new Error("Missing synthetic payment");
+    expect(record.status).toBe("manual_review");
+    for (const retry of [command, scenarioCommand(randomUUID())]) {
+      await expect(payments.createTopUpSession(retry)).rejects.toMatchObject({merchantOrderId: record.id, providerCode: "ARCO_PAY_HTTP_503"});
+    }
+    expect(creationRequests).toBe(1);
+  });
+
+  it("preserves an early verified synthetic capture even if the create response is lost", async () => {
+    beforeCreateResponse = async order => {
+      order.Status = "IPS_ACCEPTED";
+      expect((await notify(order)).body).toEqual({status: "processed"});
+      throw new Error("Fixture response lost after capture");
+    };
+    const command = scenarioCommand(randomUUID());
+    const payment = await payments.createTopUpSession(command);
+    expect(payment.status).toBe("paid");
+    expect((await payments.createTopUpSession(command)).id).toBe(payment.id);
+    const events = await pool.query("SELECT payload->>'source' AS source FROM vv_admin_integration_outbox WHERE subject_external_id=$1 AND event_type='top_up.completed'", [payment.id]);
+    expect(events.rows).toEqual([{source: "scenario"}]);
+    expect(creationRequests).toBe(1);
   });
 
   function createPayment(kind: Kind, idempotencyKey = randomUUID()) {
