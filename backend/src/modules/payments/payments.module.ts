@@ -29,6 +29,7 @@ import { PaymentHistoryService } from "./payment-history.service";
         apiKeyFile: config.arcoPay.apiKeyFile ?? "",
         bearerTokenFile: config.arcoPay.bearerTokenFile ?? "",
         shopId: config.arcoPay.shopId ?? "",
+        ...(config.arcoPay.previousShop ? { previousShop: config.arcoPay.previousShop } : {}),
         callbackUrl: config.arcoPay.callbackUrl ?? "",
         paymentOrigin: config.arcoPay.paymentOrigin,
         baseUrl: config.arcoPay.apiUrl,

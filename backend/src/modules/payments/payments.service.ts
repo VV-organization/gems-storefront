@@ -150,11 +150,13 @@ type VvAdminTopUpEventType = "top_up.created" | "top_up.completed" | "top_up.fai
 
 type TopUpPaymentReconciliationRow = TopUpPaymentWebhookRow & {
   request_hash: string;
+  provider_shop_id: string | null;
   provider_session_id: string | null;
 };
 
 type SteamRefillPaymentReconciliationRow = SteamRefillPaymentWebhookRow & {
   request_hash: string;
+  provider_shop_id: string | null;
   provider_session_id: string | null;
 };
 
@@ -165,6 +167,7 @@ type PaymentReconciliationTarget = {
 };
 
 type NormalizedArcoPayWebhook = {
+  providerShopId?: string;
   providerEventId: string;
   eventType: string;
   providerPaymentId: string | null;
@@ -918,7 +921,8 @@ export class PaymentsService {
           JSON.stringify({
             ...(bound?{...bound,quoteId:command.quoteBinding?.quoteId}:{}),
             arcoPayConfigured: true,
-            providerPaymentMethod: "unknown",
+            providerShopId: this.config.arcoPay.shopId,
+            providerPaymentMethod: "sbp",
             environment: this.config.arcoPay.environment,
           }),
         ],
@@ -949,7 +953,7 @@ export class PaymentsService {
             coinAmountMinor: command.coinAmountMinor,
             currency: "RUB",
             provider: TOP_UP_PROVIDER,
-            providerPaymentMethod: "unknown",
+            providerPaymentMethod: "sbp",
             rate: {
               fiatMinor: COIN_RATE_FIAT_MINOR,
               coinMinor: COIN_RATE_COIN_MINOR,
@@ -1132,7 +1136,8 @@ export class PaymentsService {
           JSON.stringify({
             ...(bound?{...bound,quoteId:command.quoteBinding?.quoteId}:{}),
             arcoPayConfigured: true,
-            providerPaymentMethod: "unknown",
+            providerShopId: this.config.arcoPay.shopId,
+            providerPaymentMethod: "sbp",
             environment: this.config.arcoPay.environment,
             purpose: bound?.purpose ?? "steam_refill_payment",
           }),
@@ -1165,7 +1170,7 @@ export class PaymentsService {
             feeBasisPoints: STEAM_REFILL_FEE_BASIS_POINTS,
             feeRubMinor: paymentTerms.feeRubMinor,
             provider: STEAM_REFILL_PROVIDER,
-            providerPaymentMethod: "unknown",
+            providerPaymentMethod: "sbp",
             purpose: "steam_refill_payment",
             steamAmountRubMinor: paymentTerms.amountRubMinor,
             steamLogin: command.steamLogin,
@@ -1321,10 +1326,10 @@ export class PaymentsService {
     }
     if (!command.rawBody) throw new BadRequestException("Payment notification body is required");
     let notified: ReturnType<typeof parseArcoPayPayment>;
-    try { notified = parseArcoPayPayment(JSON.parse(command.rawBody.toString("utf8")), this.config.arcoPay.shopId ?? ""); }
+    try { notified = parseArcoPayPayment(JSON.parse(command.rawBody.toString("utf8")), this.config.arcoPay.shopId ?? "", this.config.arcoPay.previousShop?.shopId); }
     catch { throw new BadRequestException("Payment notification is invalid"); }
     let payment: Awaited<ReturnType<ArcoPayClient["getPayment"]>>;
-    try { payment = await this.arcoPay.getPayment(notified.id); }
+    try { payment = await this.arcoPay.getPayment(notified.id, notified.shopId); }
     catch { throw new ServiceUnavailableException("Payment status confirmation is unavailable"); }
     if (notified.status === "captured" && !isCapturedProviderStatus(payment.status) && !isManualReviewProviderStatus(payment.status)) {
       throw new ServiceUnavailableException("Payment status confirmation is pending");
@@ -1333,11 +1338,16 @@ export class PaymentsService {
       throw new BadRequestException("Payment notification does not match provider order");
     }
     return this.processVerifiedArcoPayWebhook({
+      providerShopId: payment.shopId,
       providerEventId: createHash("sha256").update(command.rawBody).digest("hex"),
       eventType: `payment.${payment.status}`, providerPaymentId: payment.id, providerSessionId: payment.id,
       topUpPaymentId: payment.externalId, providerStatus: payment.status, amountMinor: payment.amount, currency: payment.currency,
       payloadSnapshot: { orderId: payment.id, merchantOrderId: payment.externalId, amount: payment.amount, currency: payment.currency, status: payment.status, metadata: payment.metadata },
     });
+  }
+
+  private get untaggedShopId() {
+    return this.config.arcoPay.previousShop?.shopId ?? this.config.arcoPay.shopId;
   }
 
   async reconcilePendingTopUps(command: { limit?: number; paymentId?: string } = {}): Promise<PaymentReconciliationResultDto> {
@@ -1413,6 +1423,7 @@ export class PaymentsService {
           fiat_amount_minor,
           fiat_currency,
           request_hash,
+          metadata->>'providerShopId' AS provider_shop_id,
           provider_session_id
         FROM top_up_payments
         WHERE provider = $1
@@ -1435,6 +1446,7 @@ export class PaymentsService {
             steam_login,
             order_id::text AS order_id,
             request_hash,
+            metadata->>'providerShopId' AS provider_shop_id,
             provider_session_id
           FROM steam_refill_payments
           WHERE provider = $1
@@ -1461,7 +1473,7 @@ export class PaymentsService {
       let providerPayment: Awaited<ReturnType<ArcoPayClient["getPayment"]>>;
       try {
         if (!topUpPayment.provider_session_id) throw new Error("ARCO_PAY_ORDER_ID_MISSING");
-        providerPayment = await this.arcoPay.getPayment(topUpPayment.provider_session_id);
+        providerPayment = await this.arcoPay.getPayment(topUpPayment.provider_session_id, topUpPayment.provider_shop_id ?? this.untaggedShopId);
       } catch (error) {
         result.errors += 1;
         await this.finishReconciliationAttempt({ id: topUpPayment.id, kind: "top_up" }, attemptKey, "failed", {
@@ -1512,7 +1524,7 @@ export class PaymentsService {
       let providerPayment: Awaited<ReturnType<ArcoPayClient["getPayment"]>>;
       try {
         if (!steamRefillPayment.provider_session_id) throw new Error("ARCO_PAY_ORDER_ID_MISSING");
-        providerPayment = await this.arcoPay.getPayment(steamRefillPayment.provider_session_id);
+        providerPayment = await this.arcoPay.getPayment(steamRefillPayment.provider_session_id, steamRefillPayment.provider_shop_id ?? this.untaggedShopId);
       } catch (error) {
         result.errors += 1;
         await this.finishReconciliationAttempt({ id: steamRefillPayment.id, kind: "steam_refill" }, attemptKey, "failed", {
@@ -1559,6 +1571,7 @@ export class PaymentsService {
   private async bindWebhook(client:Queryable,table:'top_up_payments'|'steam_refill_payments',id:string,event:NormalizedArcoPayWebhook,purpose:PaymentPurpose):Promise<boolean>{
     const result=await client.query<{provider_session_id:string|null;provider_payment_id:string|null;metadata:Record<string,unknown>}>(`SELECT provider_session_id,provider_payment_id,metadata FROM ${table} WHERE id=$1 FOR UPDATE`,[id]);
     const row=result.rows[0];if(!row)return false;
+    if (event.providerShopId && (row.metadata.providerShopId ?? this.untaggedShopId) !== event.providerShopId) return false;
     if(this.config.arcoPay.providerMode==='real' && row.provider_session_id!==null && row.provider_session_id!==event.providerSessionId)return false;
     const root=event.payloadSnapshot;
     const metadata={...optionalRecordField(root,'metadata'),...optionalRecordField(optionalRecordField(root,'payment'),'metadata'),...optionalRecordField(optionalRecordField(root,'data'),'metadata')};

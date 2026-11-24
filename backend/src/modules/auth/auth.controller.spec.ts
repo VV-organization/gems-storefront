@@ -18,7 +18,7 @@ function setCookie(response: request.Response, cookieName: string): string {
   return value;
 }
 
-function callbackQuery(location: string): string {
+function callbackQuery(location: string, nonce = "2026-07-27T10:00:00Znonce"): string {
   const challenge = new URL(location);
   const returnTo = new URL(challenge.searchParams.get("openid.return_to") ?? "");
   const parameters = new URLSearchParams();
@@ -29,7 +29,7 @@ function callbackQuery(location: string): string {
   parameters.set("openid.claimed_id", "https://steamcommunity.com/openid/id/76561198000000001");
   parameters.set("openid.identity", "https://steamcommunity.com/openid/id/76561198000000001");
   parameters.set("openid.return_to", returnTo.toString());
-  parameters.set("openid.response_nonce", "2026-07-27T10:00:00Znonce");
+  parameters.set("openid.response_nonce", nonce);
   parameters.set("openid.assoc_handle", "assoc");
   parameters.set("openid.signed", "op_endpoint,claimed_id,identity,return_to,response_nonce,assoc_handle");
   parameters.set("openid.sig", "signature");
@@ -136,7 +136,7 @@ describe("AuthModule", () => {
         .expect(302);
 
       const callback = await request(httpServer)
-        .get(`/auth/steam/callback?${callbackQuery(start.headers.location as string).replace("2026-07-27T10%3A00%3A00Znonce", "2026-07-27T10%3A00%3A01Znonce")}`)
+        .get(`/auth/steam/callback?${callbackQuery(start.headers.location as string, "2026-07-27T10:00:01Znonce")}`)
         .set("Cookie", setCookie(start, "__Host-gems_steam_auth"))
         .expect(302);
 
@@ -163,7 +163,7 @@ describe("AuthModule", () => {
   it("stores Steam Trade URL as write-only account state behind session and CSRF", async () => {
     const start = await request(httpServer).get("/auth/steam/start").expect(302);
     const callback = await request(httpServer)
-      .get(`/auth/steam/callback?${callbackQuery(start.headers.location as string)}`)
+      .get(`/auth/steam/callback?${callbackQuery(start.headers.location as string, "2026-07-27T10:00:02Ztrade")}`)
       .set("Cookie", setCookie(start, "__Host-gems_steam_auth"))
       .expect(302);
     const sessionCookie = setCookie(callback, "__Host-gems_session");

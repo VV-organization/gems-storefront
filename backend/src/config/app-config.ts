@@ -23,6 +23,7 @@ export type AppConfig = {
     apiKeyFile?: string;
     bearerTokenFile?: string;
     shopId?: string;
+    previousShop?: { shopId: string; apiKeyFile: string; bearerTokenFile: string };
     callbackUrl?: string;
     paymentOrigin: string;
     fakeCheckoutBaseUrl?: string;
@@ -189,6 +190,16 @@ export function loadAppConfig(env: NodeJS.ProcessEnv): AppConfig {
   const bearerTokenFile = optionalString(env.ARCO_PAY_BEARER_TOKEN_FILE);
   const shopId = optionalString(env.ARCO_PAY_SHOP_ID);
   if (shopId !== undefined && !/^[1-9]\d*$/.test(shopId)) throw new Error("ARCO_PAY_SHOP_ID must be a positive integer.");
+  const previousShopId = optionalString(env.ARCO_PAY_PREVIOUS_SHOP_ID);
+  const previousApiKeyFile = optionalString(env.ARCO_PAY_PREVIOUS_API_KEY_FILE);
+  const previousBearerTokenFile = optionalString(env.ARCO_PAY_PREVIOUS_BEARER_TOKEN_FILE);
+  const previousShop = previousShopId && previousApiKeyFile && previousBearerTokenFile
+    ? { shopId: previousShopId, apiKeyFile: previousApiKeyFile, bearerTokenFile: previousBearerTokenFile }
+    : undefined;
+  if ((previousShopId || previousApiKeyFile || previousBearerTokenFile) &&
+      (!previousShop || !/^[1-9]\d*$/.test(previousShop.shopId) || previousShop.shopId === shopId || !shopId)) {
+    throw new Error("Previous Arco Pay shop requires a distinct shop ID and both credential files.");
+  }
   const callbackUrl = parseHttpsPublicBaseUrl("ARCO_PAY_CALLBACK_URL", env.ARCO_PAY_CALLBACK_URL);
   const arcoPayProviderMode = parseArcoPayProviderMode(nodeEnv, env.ARCO_PAY_PROVIDER_MODE);
   const arcoPayFakeCheckoutBaseUrl = parseHttpOrHttpsBaseUrl("ARCO_PAY_FAKE_CHECKOUT_BASE_URL", env.ARCO_PAY_FAKE_CHECKOUT_BASE_URL);
@@ -259,6 +270,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv): AppConfig {
       paymentOrigin,
       ...(bearerTokenFile ? { bearerTokenFile } : {}),
       ...(shopId ? { shopId } : {}),
+      ...(previousShop ? { previousShop } : {}),
       ...(callbackUrl ? { callbackUrl } : {}),
       environment: parseArcoPayEnvironment(env.ARCO_PAY_ENVIRONMENT),
       providerMode: arcoPayProviderMode,

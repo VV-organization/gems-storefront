@@ -8,9 +8,10 @@ export type CreateHostedCheckoutCommand = {
   buyerEmail?: string;
 };
 export type HostedCheckoutResult = { providerSessionId: string; checkoutUrl: string };
-export type ArcoPayPayment = { id: string; status: string; amount: number; currency: string; externalId: string; metadata: Record<string, string> };
+export type ArcoPayPayment = { id: string; shopId: string; status: string; amount: number; currency: string; externalId: string; metadata: Record<string, string> };
 export type ArcoPayClientOptions = {
   apiKeyFile: string; bearerTokenFile: string; shopId: string; callbackUrl: string;
+  previousShop?: { shopId: string; apiKeyFile: string; bearerTokenFile: string };
   baseUrl?: string; paymentOrigin?: string;
   fetch?: (input: string, init?: RequestInit) => Promise<Response>;
 };
@@ -38,16 +39,17 @@ const orderSchema = z.object({
   ]),
 });
 
-export function parseArcoPayPayment(payload: unknown, shopId: string): ArcoPayPayment {
+export function parseArcoPayPayment(payload: unknown, shopId: string, previousShopId?: string): ArcoPayPayment {
   const parsed = z.object({ Response: z.object({ Success: z.literal(true) }), Order: orderSchema }).safeParse(payload);
   if (!parsed.success) throw new Error("ARCO_PAY_RESPONSE_INVALID");
   const order = parsed.data.Order;
-  if (String(order.ShopId) !== shopId || order.Currency !== "RUB" ||
+  const orderShopId = String(order.ShopId);
+  if ((orderShopId !== shopId && orderShopId !== previousShopId) || order.Currency !== "RUB" ||
       (order.Status === "IPS_ACCEPTED" && order.PaymentType !== undefined && order.PaymentType !== "IPS") ||
       (order.Status === "CHARGED" && order.PaymentType !== undefined && order.PaymentType !== "CARD")) {
     throw new Error("ARCO_PAY_ORDER_MISMATCH");
   }
-  return { id: order.OrderId, externalId: order.MerchantOrderId, amount: order.Amount, currency: order.Currency,
+  return { id: order.OrderId, shopId: orderShopId, externalId: order.MerchantOrderId, amount: order.Amount, currency: order.Currency,
     status: order.Status === "IPS_ACCEPTED" || order.Status === "CHARGED" ? "captured" : order.Status.toLowerCase(),
     metadata: order.Status === "IPS_ACCEPTED" ? {providerPaymentMethod:"sbp"} : order.Status === "CHARGED" ? {providerPaymentMethod:"card"} : {} };
 }
@@ -78,7 +80,7 @@ export class ArcoPayClient {
     [command.successUrl, command.failUrl, command.cancelUrl, this.options.callbackUrl].forEach(httpsUrl);
     const payment = await this.request("/payments/create", {
       MerchantOrderId: command.externalId, Amount: command.amountMinor, Currency: "RUB", Type: "PayIn",
-      PaymentTypes: ["CARD", "IPS"], IsForm: true, LifeTime: 900, Description: command.description,
+      PaymentTypes: ["IPS"], IsForm: true, LifeTime: 900, Description: command.description,
       CallbackUrl: this.options.callbackUrl,
       RedirectUrl: { SuccessUrl: command.successUrl, FailUrl: command.failUrl },
       ...(command.buyerEmail ? { Buyer: { Email: command.buyerEmail } } : {}),
@@ -87,18 +89,21 @@ export class ArcoPayClient {
     return { providerSessionId: payment.id, checkoutUrl: new URL(`/${payment.id}`, this.paymentOrigin).href };
   }
 
-  async getPayment(paymentId: string): Promise<ArcoPayPayment> {
+  async getPayment(paymentId: string, shopId = this.options.shopId): Promise<ArcoPayPayment> {
     if (!orderId.safeParse(paymentId).success) throw new Error("ARCO_PAY_ORDER_ID_INVALID");
-    const payment = await this.request("/payments/status", { OrderId: paymentId }, randomUUID());
+    const shop = shopId === this.options.shopId ? this.options : this.options.previousShop;
+    if (!shop || shop.shopId !== shopId) throw new Error("ARCO_PAY_SHOP_ID_INVALID");
+    const payment = await this.request("/payments/status", { OrderId: paymentId }, randomUUID(), shop);
     if (payment.id !== paymentId) throw new Error("ARCO_PAY_ORDER_MISMATCH");
     return payment;
   }
 
-  private async request(path: string, body: unknown, requestId: string): Promise<ArcoPayPayment> {
-    if (!/^[1-9]\d*$/.test(this.options.shopId)) throw new Error("ARCO_PAY_SHOP_ID_INVALID");
+  private async request(path: string, body: unknown, requestId: string,
+    shop: Pick<ArcoPayClientOptions, "shopId" | "apiKeyFile" | "bearerTokenFile"> = this.options): Promise<ArcoPayPayment> {
+    if (!/^[1-9]\d*$/.test(shop.shopId)) throw new Error("ARCO_PAY_SHOP_ID_INVALID");
     let apiKey: string, token: string;
     try {
-      const credentials = await Promise.all([readFile(this.options.apiKeyFile, "utf8"), readFile(this.options.bearerTokenFile, "utf8")]);
+      const credentials = await Promise.all([readFile(shop.apiKeyFile, "utf8"), readFile(shop.bearerTokenFile, "utf8")]);
       apiKey = credentials[0].trim(); token = credentials[1].trim();
       if (!apiKey || !token || /\s/.test(apiKey) || /\s/.test(token)) throw new Error();
     } catch { throw new Error("ARCO_PAY_CREDENTIALS_UNAVAILABLE"); }
@@ -136,6 +141,6 @@ export class ArcoPayClient {
       throw new Error("ARCO_PAY_RESPONSE_INVALID");
     } finally { reader.releaseLock(); }
     if (z.object({ Response: z.object({ Success: z.literal(false) }) }).safeParse(payload).success) throw new ArcoPayRequestRejectedError();
-    return parseArcoPayPayment(payload, this.options.shopId);
+    return parseArcoPayPayment(payload, shop.shopId);
   }
 }

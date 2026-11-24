@@ -99,3 +99,5 @@ API создания платежа: `https://api.clickit.team/api/v1/payments/c
 конфигурации переводится на Clickit. Сохранённые ссылки старых сессий также открываются
 на Clickit с тем же OrderId через POST с `successUrl` и `failUrl`; новый платёж не создаётся.
 Ключи, shop, проверка webhook и правила зачисления при этой замене не меняются.
+
+Новые пополнения Gems и Steam используют СБП (`IPS`) в магазине 1724. Для сверки заказов без сохранённого магазина задайте `ARCO_PAY_PREVIOUS_SHOP_ID=1502`, `ARCO_PAY_PREVIOUS_API_KEY` и `ARCO_PAY_PREVIOUS_BEARER_TOKEN`. Новые заказы сохраняют магазин при создании.
