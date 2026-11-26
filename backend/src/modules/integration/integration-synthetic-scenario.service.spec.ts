@@ -19,7 +19,7 @@ describe("Gems payment scenario", () => {
     const response = await service.runCheckoutPaymentReached({runId: "test-run"});
     expect(createTopUpSession).toHaveBeenCalledWith({userId: "synthetic:vv-admin", idempotencyKey: "vv-admin-synthetic-test-run", coinAmountMinor: 10000});
     expect(response).toMatchObject({error: "BROWSER_PAYMENT_REQUIRED", payment: {reached: false}, browserPayment: {
-      method: "POST", topUpId: "merchant-id", action: "https://payment.clickit.team/order-id",
+      method: "POST", paymentMethod: "sbp", topUpId: "merchant-id", action: "https://payment.clickit.team/order-id",
       successUrl: "https://gems.example/payments/return?session=merchant-id&payment=success",
     }});
   });

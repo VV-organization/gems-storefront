@@ -50,7 +50,7 @@ export class IntegrationSyntheticScenarioService {
     fail.searchParams.set("payment", "failed");
     return {
       ...result("BROWSER_PAYMENT_REQUIRED", "Ожидается загрузка формы Clickit", payment.id),
-      browserPayment: {method: "POST", topUpId: payment.id, action: action.href, successUrl: success.href, failUrl: fail.href},
+      browserPayment: {method: "POST" as const, paymentMethod: "sbp" as const, topUpId: payment.id, action: action.href, successUrl: success.href, failUrl: fail.href},
     };
   }
 }
