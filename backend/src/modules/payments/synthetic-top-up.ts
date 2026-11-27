@@ -1,7 +1,8 @@
 import type { QueryResult, QueryResultRow } from "pg";
 
 export const SCENARIO_USER_ID = "synthetic:vv-admin";
-export const SCENARIO_COIN_MINOR = 10_000;
+// Match the storefront's first quick-select amount (500 Gems = 250 RUB).
+export const SCENARIO_COIN_MINOR = 50_000;
 
 export class ScenarioPaymentBlocked extends Error {
   constructor(readonly merchantOrderId: string, readonly providerCode: string | null) {
